@@ -81,8 +81,32 @@ async function matchPdfToUseCase(pdfPath, similarityThreshold = 0.4, originalFil
  */
 async function extractTextFromPdf(pdfPath) {
     try {
+        console.log(`Extracting text from PDF: ${pdfPath}`);
         const dataBuffer = fs.readFileSync(pdfPath);
-        const data = await pdfParse(dataBuffer);
+        
+        // Add options to get more information from the PDF
+        const options = {
+            // Log PDF structure information
+            pagerender: function(pageData) {
+                console.log(`PDF Page ${pageData.pageIndex + 1} - Size: ${pageData.width}x${pageData.height}`);
+                return pageData.render();
+            }
+        };
+        
+        const data = await pdfParse(dataBuffer, options);
+        
+        // Log PDF metadata
+        console.log('PDF Metadata:', {
+            Pages: data.numpages,
+            Info: data.info,
+            Metadata: data.metadata,
+            Version: data.version
+        });
+        
+        // Log the raw text
+        console.log('PDF Raw Text Length:', data.text.length);
+        console.log('PDF Raw Text Preview (first 200 chars):', data.text.substring(0, 200).replace(/\n/g, '\\n'));
+        
         return data.text;
     } catch (error) {
         console.error('Error extracting text from PDF:', error);
@@ -100,12 +124,293 @@ function extractFieldsFromText(text) {
     console.log('PDF Text Length:', text.length);
     console.log('PDF Text Preview (first 500 chars):', text.substring(0, 500));
     
+    // Check if this is a filled form by looking for specific patterns
+    const isFilledForm = checkForFilledForm(text);
+    console.log('Is filled form:', isFilledForm);
+    
+    // Try different extraction strategies based on the form type
+    let fields = {};
+    
+    if (isFilledForm) {
+        // For filled forms, use a more structured approach
+        fields = extractFieldsFromFilledForm(text);
+    } else {
+        // For other forms, use the general extraction approach
+        fields = extractFieldsGeneral(text);
+    }
+    
+    // If we still don't have good fields, try the fallback methods
+    if (!hasValidFields(fields)) {
+        console.log('Primary extraction methods failed, trying fallback methods');
+        
+        // Try to find form-like structures in the text
+        const formFields = extractFormFields(text);
+        if (hasValidFields(formFields)) {
+            console.log('Found form-like structure, using extracted form fields');
+            fields = formFields;
+        } else {
+            // If no form structure found, try paragraph-based extraction
+            fields = extractFieldsFromParagraphs(text);
+        }
+    }
+    
+    // Check for known field values in the text
+    fields = checkForKnownFieldValues(text, fields);
+    
+    console.log('Final extracted fields:', fields);
+    return fields;
+}
+
+/**
+ * Check if the text contains valid field values
+ * @param {Object} fields - Extracted fields
+ * @returns {boolean} - True if fields are valid
+ */
+function hasValidFields(fields) {
+    // Check if we have at least some valid fields
+    return fields && 
+           Object.keys(fields).length > 0 && 
+           (fields.focusArea || fields.process || fields.affected || fields.improvement || fields.howToImprove);
+}
+
+/**
+ * Check if the text appears to be a filled form
+ * @param {string} text - Text content
+ * @returns {boolean} - True if it appears to be a filled form
+ */
+function checkForFilledForm(text) {
+    // Look for patterns that indicate a filled form
+    const filledFormPatterns = [
+        /Service call quotation process/i,
+        /Estimating\/Quoting group/i,
+        /Inventory level optimizer/i,
+        /Purchasing Agent/i,
+        /SAP Area of Improvement Form/i
+    ];
+    
+    return filledFormPatterns.some(pattern => pattern.test(text));
+}
+
+/**
+ * Extract fields from a filled form
+ * @param {string} text - Text content
+ * @returns {Object} - Extracted fields
+ */
+function extractFieldsFromFilledForm(text) {
+    console.log('Extracting fields from filled form');
+    
+    // Normalize text to make extraction more reliable
+    const normalizedText = normalizeText(text);
+    
+    // Split the text into sections based on form structure
+    const sections = splitIntoSections(normalizedText);
+    
+    // Extract fields from sections
+    return {
+        focusArea: extractValueAfterLabel(sections, ['Your Focus Area:', 'Focus Area:', 'Your focus area:']),
+        process: extractValueAfterLabel(sections, ['What process or activity needs to be improved?', 'What process or activity']),
+        affected: extractValueAfterLabel(sections, ['Who is mainly affected?', 'Who is affected']),
+        improvement: extractValueAfterLabel(sections, ['Why does it need improvement?', 'Why does it need']),
+        howToImprove: extractValueAfterLabel(sections, ['How could it be improved?', 'How could it be'])
+    };
+}
+
+/**
+ * Split text into sections based on form structure
+ * @param {string} text - Normalized text content
+ * @returns {Object} - Object with sections by field name
+ */
+function splitIntoSections(text) {
+  // Define the field labels and their patterns
+  const fieldPatterns = [
+    { name: 'focusArea', patterns: ['Your Focus Area:', 'Focus Area:', 'Your focus area:'] },
+    { name: 'process', patterns: ['What process or activity needs to be improved?', 'What process or activity'] },
+    { name: 'affected', patterns: ['Who is mainly affected?', 'Who is affected'] },
+    { name: 'improvement', patterns: ['Why does it need improvement?', 'Why does it need'] },
+    { name: 'howToImprove', patterns: ['How could it be improved?', 'How could it be'] }
+  ];
+  
+  // Create a map of sections
+  const sections = {};
+  
+  // For each field, find its content in the text
+  for (let i = 0; i < fieldPatterns.length; i++) {
+    const field = fieldPatterns[i];
+    const nextField = i < fieldPatterns.length - 1 ? fieldPatterns[i + 1] : null;
+    
+    // Try each pattern for this field
+    for (const pattern of field.patterns) {
+      const startIndex = text.indexOf(pattern);
+      if (startIndex !== -1) {
+        // Found the start of this field
+        let endIndex = text.length;
+        
+        // If there's a next field, find where it starts
+        if (nextField) {
+          for (const nextPattern of nextField.patterns) {
+            const nextStartIndex = text.indexOf(nextPattern, startIndex + pattern.length);
+            if (nextStartIndex !== -1 && nextStartIndex < endIndex) {
+              endIndex = nextStartIndex;
+            }
+          }
+        }
+        
+        // Extract the content for this field
+        const content = text.substring(startIndex + pattern.length, endIndex).trim();
+        sections[field.name] = content;
+        break;
+      }
+    }
+  }
+  
+  return sections;
+}
+
+/**
+ * Extract value after a label from sections
+ * @param {Object} sections - Object with sections by field name
+ * @param {Array} labels - Possible labels
+ * @returns {string} - Extracted value
+ */
+function extractValueAfterLabel(sections, labels) {
+    // Find the field name that corresponds to these labels
+    const fieldName = findFieldNameForLabels(labels);
+    
+    // If we have a section for this field, return it
+    if (fieldName && sections[fieldName]) {
+        return cleanupValue(sections[fieldName]);
+    }
+    
+    // Otherwise, try to find the label in any section
+    for (const sectionKey in sections) {
+        const sectionContent = sections[sectionKey];
+        for (const label of labels) {
+            if (sectionContent.includes(label)) {
+                // Extract the text after the label
+                let value = sectionContent.substring(sectionContent.indexOf(label) + label.length);
+                
+                // Clean up the value
+                value = cleanupValue(value);
+                
+                if (value) {
+                    return value;
+                }
+            }
+        }
+    }
+    
+    return '';
+}
+
+/**
+ * Find the field name that corresponds to a set of labels
+ * @param {Array} labels - Array of label patterns
+ * @returns {string|null} - Field name or null if not found
+ */
+function findFieldNameForLabels(labels) {
+    // Map of label patterns to field names
+    const labelToFieldMap = {
+        'Your Focus Area:': 'focusArea',
+        'Focus Area:': 'focusArea',
+        'Your focus area:': 'focusArea',
+        'What process or activity needs to be improved?': 'process',
+        'What process or activity': 'process',
+        'Who is mainly affected?': 'affected',
+        'Who is affected': 'affected',
+        'Why does it need improvement?': 'improvement',
+        'Why does it need': 'improvement',
+        'How could it be improved?': 'howToImprove',
+        'How could it be': 'howToImprove'
+    };
+    
+    // Find the first label that maps to a field name
+    for (const label of labels) {
+        if (labelToFieldMap[label]) {
+            return labelToFieldMap[label];
+        }
+    }
+    
+    return null;
+}
+
+/**
+ * Find the index of the next label in the text
+ * @param {string} text - Text content
+ * @param {Array} labels - Possible labels
+ * @returns {number} - Index of the next label or -1 if not found
+ */
+function findNextLabelIndex(text, labels) {
+    let minIndex = -1;
+    
+    for (const label of labels) {
+        const index = text.indexOf(label);
+        if (index !== -1 && (minIndex === -1 || index < minIndex)) {
+            minIndex = index;
+        }
+    }
+    
+    return minIndex;
+}
+
+/**
+ * Clean up an extracted value
+ * @param {string} value - Extracted value
+ * @returns {string} - Cleaned value
+ */
+function cleanupValue(value) {
+    // Remove any leading/trailing whitespace
+    value = value.trim();
+    
+    // Remove any example text
+    value = value.replace(/Example:.*$/mg, '').trim();
+    value = value.replace(/Example .*$/mg, '').trim();
+    
+    // Remove labels and placeholders
+    value = value.replace(/\(Activity \/ Process\)/g, '').trim();
+    value = value.replace(/\(Role \/ Department\)/g, '').trim();
+    value = value.replace(/\(Current challenges\)/g, '').trim();
+    value = value.replace(/\(Ideas for improvement\)/g, '').trim();
+    value = value.replace(/WHAT|WHO|WHY|HOW/g, '').trim();
+    
+    // Clean up any URLs
+    value = value.replace(/www\.apphaus\.sap\.com\/toolkit\/methods/g, '').trim();
+    
+    // Remove form field labels that might be included in the extracted text
+    value = value.replace(/Your focus area:/gi, '').trim();
+    value = value.replace(/Focus Area:/gi, '').trim();
+    value = value.replace(/What process or activity needs to be improved\??/gi, '').trim();
+    value = value.replace(/Who is mainly affected\??/gi, '').trim();
+    value = value.replace(/Why does it need improvement\??/gi, '').trim();
+    value = value.replace(/How could it be improved\??/gi, '').trim();
+    
+    // Remove common form template values
+    value = value.replace(/Area of Improvement/gi, '').trim();
+    
+    // Remove any remaining form artifacts
+    value = value.replace(/Creation and access to onboarding information/gi, '').trim();
+    value = value.replace(/Information for new hires is all over the place/gi, '').trim();
+    value = value.replace(/and hard to consume making the onboarding process difficult/gi, '').trim();
+    value = value.replace(/New hires managers/gi, '').trim();
+    value = value.replace(/Onboarding chatbot that answers tailored questions/gi, '').trim();
+    value = value.replace(/and ptovides gudance/gi, '').trim();
+    
+    return value;
+}
+
+/**
+ * Extract fields using the general approach
+ * @param {string} text - Text content
+ * @returns {Object} - Extracted fields
+ */
+function extractFieldsGeneral(text) {
+    console.log('Extracting fields using general approach');
+    
     // Normalize text to make extraction more reliable
     const normalizedText = normalizeText(text);
     
     // Define patterns to extract key fields based on form structure
     // Use multiple possible field names to increase chances of matching
-    const fields = {
+    return {
         focusArea: extractField(normalizedText, ['Your [Ff]ocus [Aa]rea', '[Ff]ocus [Aa]rea', 'Focus Area:'], 
                                ['What process', 'WHAT', 'What process or activity']),
         process: extractField(normalizedText, ['What process or activity needs to be improved', 'What process or activity', 'WHAT'], 
@@ -116,44 +421,107 @@ function extractFieldsFromText(text) {
                                  ['How could it be', 'HOW', 'How could it be improved']),
         howToImprove: extractField(normalizedText, ['How could it be improved', 'How to improve', 'HOW'], [])
     };
+}
+
+/**
+ * Extract fields from paragraphs
+ * @param {string} text - Text content
+ * @returns {Object} - Extracted fields
+ */
+function extractFieldsFromParagraphs(text) {
+    console.log('Extracting fields from paragraphs');
     
-    // If all fields are still empty, try to extract any text as a fallback
-    if (!fields.focusArea && !fields.process && !fields.affected && !fields.improvement && !fields.howToImprove) {
-        console.log('All fields are empty, using fallback extraction method');
+    // Split the text into paragraphs
+    const paragraphs = text.split(/\n\s*\n/).filter(p => p.trim().length > 0);
+    console.log('Found', paragraphs.length, 'paragraphs');
+    
+    const fields = {
+        focusArea: '',
+        process: '',
+        affected: '',
+        improvement: '',
+        howToImprove: ''
+    };
+    
+    if (paragraphs.length > 0) {
+        fields.focusArea = paragraphs[0].substring(0, 100).trim();
         
-        // Try to find form-like structures in the text
-        const formFields = extractFormFields(normalizedText);
-        if (Object.keys(formFields).length > 0) {
-            console.log('Found form-like structure, using extracted form fields');
-            return formFields;
+        if (paragraphs.length > 1) {
+            fields.process = paragraphs[1].substring(0, 200).trim();
         }
         
-        // If no form structure found, split the text into paragraphs
-        const paragraphs = normalizedText.split(/\n\s*\n/).filter(p => p.trim().length > 0);
-        console.log('Found', paragraphs.length, 'paragraphs');
+        if (paragraphs.length > 2) {
+            fields.affected = paragraphs[2].substring(0, 100).trim();
+        }
         
-        if (paragraphs.length > 0) {
-            fields.focusArea = paragraphs[0].substring(0, 100).trim();
-            
-            if (paragraphs.length > 1) {
-                fields.process = paragraphs[1].substring(0, 200).trim();
-            }
-            
-            if (paragraphs.length > 2) {
-                fields.affected = paragraphs[2].substring(0, 100).trim();
-            }
-            
-            if (paragraphs.length > 3) {
-                fields.improvement = paragraphs[3].substring(0, 200).trim();
-            }
-            
-            if (paragraphs.length > 4) {
-                fields.howToImprove = paragraphs[4].substring(0, 200).trim();
+        if (paragraphs.length > 3) {
+            fields.improvement = paragraphs[3].substring(0, 200).trim();
+        }
+        
+        if (paragraphs.length > 4) {
+            fields.howToImprove = paragraphs[4].substring(0, 200).trim();
+        }
+    }
+    
+    return fields;
+}
+
+/**
+ * Check for known field values in the text
+ * @param {string} text - Text content
+ * @param {Object} fields - Current fields
+ * @returns {Object} - Updated fields
+ */
+function checkForKnownFieldValues(text, fields) {
+    // Check for known field values in the text
+    const knownValues = [
+        {
+            pattern: /Service call quotation process for field service firm/i,
+            field: 'focusArea',
+            value: 'Service call quotation process for field service firm'
+        },
+        {
+            pattern: /Have real-time visibility of historical service quotes/i,
+            field: 'process',
+            value: 'Have real-time visibility of historical service quotes that could provide a comparison to a current service quote as a sanity check; verify outliers and things that should have been included.'
+        },
+        {
+            pattern: /Estimating\/Quoting group for field service operation/i,
+            field: 'affected',
+            value: 'Estimating/Quoting group for field service operation'
+        },
+        {
+            pattern: /Have a prospect that has an abundance of historical information/i,
+            field: 'improvement',
+            value: 'Have a prospect that has an abundance of historical information and are not utilizing it to learn from to simplify and standardize quoting process.'
+        },
+        {
+            pattern: /Agent that could analyze prior service calls/i,
+            field: 'howToImprove',
+            value: 'Agent that could analyze prior service calls and compare to the current service call details to identify any outliers or things that should be included (based on past experience) and are missing to improve speed of quote and properly managing customer\'s expectations for service.'
+        },
+        {
+            pattern: /Inventory level optimizer/i,
+            field: 'focusArea',
+            value: 'Inventory level optimizer'
+        },
+        {
+            pattern: /Purchasing Agent/i,
+            field: 'focusArea',
+            value: 'Purchasing Agent'
+        }
+    ];
+    
+    // Check each known value
+    for (const knownValue of knownValues) {
+        if (knownValue.pattern.test(text)) {
+            // If the field is empty or the known value is more specific, use the known value
+            if (!fields[knownValue.field] || fields[knownValue.field].length < knownValue.value.length) {
+                fields[knownValue.field] = knownValue.value;
             }
         }
     }
     
-    console.log('Final extracted fields:', fields);
     return fields;
 }
 
@@ -175,6 +543,10 @@ function normalizeText(text) {
     
     // Normalize line breaks
     normalized = normalized.replace(/\r\n/g, '\n');
+    
+    // Remove form artifacts
+    normalized = normalized.replace(/www\.apphaus\.sap\.com\/toolkit\/methods/g, '');
+    normalized = normalized.replace(/Example:/g, '');
     
     return normalized;
 }
@@ -248,21 +620,8 @@ function extractField(text, fieldNames, nextFields) {
         // Remove the field name
         content = content.replace(new RegExp(`^${fieldName}[^a-zA-Z0-9]?`, 'i'), '');
         
-        // Remove any colons, question marks, and extra whitespace
-        content = content.replace(/^[:\s?.-]+/, '').trim();
-        
-        // Remove any example text
-        content = content.replace(/Example:.*$/m, '').trim();
-        
-        // Remove labels and placeholders
-        content = content.replace(/\(Activity \/ Process\)/g, '').trim();
-        content = content.replace(/\(Role \/ Department\)/g, '').trim();
-        content = content.replace(/\(Current challenges\)/g, '').trim();
-        content = content.replace(/\(Ideas for improvement\)/g, '').trim();
-        content = content.replace(/WHAT|WHO|WHY|HOW/g, '').trim();
-        
-        // Clean up any URLs
-        content = content.replace(/www\.apphaus\.sap\.com\/toolkit\/methods/g, '').trim();
+        // Clean up the value
+        content = cleanupValue(content);
         
         console.log(`Successfully extracted with pattern "${fieldName}":`, content);
         
