@@ -1,0 +1,80 @@
+{
+  "favorites": {
+    "default": [
+      "ERP_01a",
+      "ERP_15",
+      "ERP_01b",
+      "BTP_08",
+      "ERP_04",
+      "ERP_14",
+      "ERP_02"
+    ]
+  },
+  "annotations": {},
+  "ratings": {
+    "default": {
+      "ERP_01a": {
+        "rating": 4,
+        "feedback": "",
+        "timestamp": "2025-02-26T23:01:51.588Z"
+      }
+    }
+  },
+  "filterHistory": [
+    {
+      "id": "1740610731109",
+      "userId": "default",
+      "filters": {
+        "role": "",
+        "module": "",
+        "keyword": "closing"
+      },
+      "name": "",
+      "timestamp": "2025-02-26T22:58:51.109Z"
+    },
+    {
+      "id": "1740610967782",
+      "userId": "default",
+      "filters": {
+        "role": "",
+        "module": "",
+        "keyword": "closing"
+      },
+      "name": "",
+      "timestamp": "2025-02-26T23:02:47.782Z"
+    },
+    {
+      "id": "1740610990358",
+      "userId": "default",
+      "filters": {
+        "role": "",
+        "module": "",
+        "keyword": "writing"
+      },
+      "name": "",
+      "timestamp": "2025-02-26T23:03:10.358Z"
+    },
+    {
+      "id": "1740611218492",
+      "userId": "default",
+      "filters": {
+        "role": "",
+        "module": "",
+        "keyword": "matching"
+      },
+      "name": "",
+      "timestamp": "2025-02-26T23:06:58.492Z"
+    },
+    {
+      "id": "1740611254814",
+      "userId": "default",
+      "filters": {
+        "role": "",
+        "module": "",
+        "keyword": "mismatch "
+      },
+      "name": "",
+      "timestamp": "2025-02-26T23:07:34.814Z"
+    }
+  ]
+}
