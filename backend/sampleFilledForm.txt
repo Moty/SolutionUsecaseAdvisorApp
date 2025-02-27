@@ -1,0 +1,15 @@
+SAP Area of Improvement Form
+
+Your Focus Area: ERP
+
+What process or activity needs to be improved?
+I need to quickly find relevant information in a private cloud environment to support internal customers.
+
+Who is mainly affected?
+Finance Support Specialist
+
+Why does it need improvement?
+Manual search takes too much time, around 10 minutes per query. This delays response to internal customers and reduces productivity.
+
+How could it be improved?
+Implement a natural language search capability that can understand context and provide faster, more accurate results. Secure access to information in the private cloud environment is essential.

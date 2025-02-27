@@ -2,6 +2,21 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const { Parser } = require('json2csv');
+const multer = require('multer');
+const { matchPdfToUseCase } = require('../pdfMatcher');
+
+// Set up multer for file uploads
+const upload = multer({ 
+  dest: path.join(__dirname, '../uploads/'),
+  fileFilter: (req, file, cb) => {
+    // Accept only PDF files
+    if (file.mimetype === 'application/pdf') {
+      cb(null, true);
+    } else {
+      cb(new Error('Only PDF files are allowed'), false);
+    }
+  }
+});
 
 const router = express.Router();
 
@@ -419,6 +434,228 @@ router.post('/filter-history', express.json(), (req, res) => {
     res.json({ success: true, history: userDataStore.filterHistory.filter(item => item.userId === userId) });
   } catch (error) {
     console.error('Error adding filter history:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// PDF MATCHING ENDPOINT
+
+/**
+ * POST /api/match-pdf - Match a PDF to existing use cases
+ * 
+ * This endpoint accepts a PDF file upload and returns the best matching use case
+ * based on similarity between the PDF content and existing use cases.
+ * 
+ * Request:
+ * - multipart/form-data with a 'pdf' file field
+ * - optional 'threshold' field (number between 0-1, default: 0.6)
+ * 
+ * Response:
+ * - JSON object with the best matching use case and similarity score
+ * - If no match is found, returns a message and the best candidate
+ */
+router.post('/match-pdf', upload.single('pdf'), async (req, res) => {
+  try {
+    // Check if a file was uploaded
+    if (!req.file) {
+      return res.status(400).json({ message: 'No PDF file uploaded' });
+    }
+    
+    // Get the path to the uploaded file
+    const pdfPath = req.file.path;
+    
+    // Get the similarity threshold from the request (default: 0.6)
+    const threshold = req.body.threshold ? parseFloat(req.body.threshold) : 0.6;
+    
+    // Get the original filename
+    const originalFilename = req.file.originalname;
+    
+    // Match the PDF to existing use cases
+    const match = await matchPdfToUseCase(pdfPath, threshold, originalFilename);
+    
+    // Ensure the original filename is set in the response
+    if (!match.pdfFileName) {
+      match.pdfFileName = originalFilename;
+    }
+    
+    // Log the final response for debugging
+    console.log('Final API response:', JSON.stringify(match, null, 2));
+    
+    // Clean up the temporary file
+    fs.unlinkSync(pdfPath);
+    
+    // Return the match result
+    res.json(match);
+  } catch (error) {
+    console.error('Error matching PDF:', error);
+    
+    // Clean up the temporary file if it exists
+    if (req.file && req.file.path && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+    
+    // Return an error response
+    res.status(500).json({ 
+      message: 'Failed to match PDF', 
+      error: error.message 
+    });
+  }
+});
+
+// NEW USE CASES ENDPOINTS
+
+/**
+ * Helper function to load new use cases data
+ * @returns {Array} - Array of new use case objects
+ */
+const loadNewUseCases = () => {
+  try {
+    const dataPath = path.join(__dirname, '../data/newUseCases.json');
+    if (fs.existsSync(dataPath)) {
+      const newUseCasesData = fs.readFileSync(dataPath, 'utf8');
+      return JSON.parse(newUseCasesData);
+    }
+    return [];
+  } catch (error) {
+    console.error('Error loading new use cases data:', error);
+    return [];
+  }
+};
+
+/**
+ * Helper function to save new use cases data
+ * @param {Array} newUseCases - Array of new use case objects
+ */
+const saveNewUseCases = (newUseCases) => {
+  try {
+    const dataPath = path.join(__dirname, '../data/newUseCases.json');
+    fs.writeFileSync(dataPath, JSON.stringify(newUseCases, null, 2), 'utf8');
+  } catch (error) {
+    console.error('Error saving new use cases data:', error);
+    throw new Error('Failed to save new use cases data');
+  }
+};
+
+/**
+ * GET /api/new-use-cases - Get all new use cases
+ */
+router.get('/new-use-cases', (req, res) => {
+  try {
+    const newUseCases = loadNewUseCases();
+    res.json(newUseCases);
+  } catch (error) {
+    console.error('Error getting new use cases:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+/**
+ * POST /api/new-use-cases - Save a new use case
+ */
+router.post('/new-use-cases', express.json(), (req, res) => {
+  try {
+    const { extractedFields, mappedFields, pdfFileName } = req.body;
+    
+    if (!extractedFields || !mappedFields) {
+      return res.status(400).json({ message: 'Extracted fields and mapped fields are required' });
+    }
+    
+    // Load existing new use cases
+    const newUseCases = loadNewUseCases();
+    
+    // Generate a new ID
+    const newId = `NEW_${String(newUseCases.length + 1).padStart(3, '0')}`;
+    
+    // Create a new use case
+    const newUseCase = {
+      id: newId,
+      timestamp: new Date().toISOString(),
+      status: 'pending',
+      extractedFields,
+      mappedFields: {
+        ...mappedFields,
+        UseCaseID: newId
+      },
+      pdfFileName: pdfFileName || 'unknown.pdf',
+      notes: ''
+    };
+    
+    // Add the new use case
+    newUseCases.push(newUseCase);
+    
+    // Save the updated new use cases
+    saveNewUseCases(newUseCases);
+    
+    res.status(201).json(newUseCase);
+  } catch (error) {
+    console.error('Error saving new use case:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+/**
+ * PUT /api/new-use-cases/:id - Update a new use case
+ */
+router.put('/new-use-cases/:id', express.json(), (req, res) => {
+  try {
+    const { id } = req.params;
+    const { extractedFields, mappedFields, status, notes } = req.body;
+    
+    // Load existing new use cases
+    const newUseCases = loadNewUseCases();
+    
+    // Find the use case to update
+    const index = newUseCases.findIndex(useCase => useCase.id === id);
+    
+    if (index === -1) {
+      return res.status(404).json({ message: 'Use case not found' });
+    }
+    
+    // Update the use case
+    newUseCases[index] = {
+      ...newUseCases[index],
+      extractedFields: extractedFields || newUseCases[index].extractedFields,
+      mappedFields: mappedFields || newUseCases[index].mappedFields,
+      status: status || newUseCases[index].status,
+      notes: notes !== undefined ? notes : newUseCases[index].notes
+    };
+    
+    // Save the updated new use cases
+    saveNewUseCases(newUseCases);
+    
+    res.json(newUseCases[index]);
+  } catch (error) {
+    console.error('Error updating new use case:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+/**
+ * DELETE /api/new-use-cases/:id - Delete a new use case
+ */
+router.delete('/new-use-cases/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Load existing new use cases
+    const newUseCases = loadNewUseCases();
+    
+    // Find the use case to delete
+    const index = newUseCases.findIndex(useCase => useCase.id === id);
+    
+    if (index === -1) {
+      return res.status(404).json({ message: 'Use case not found' });
+    }
+    
+    // Remove the use case
+    newUseCases.splice(index, 1);
+    
+    // Save the updated new use cases
+    saveNewUseCases(newUseCases);
+    
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting new use case:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });

@@ -1,0 +1,67 @@
+Testing field extraction from FieldServiceQuotes.pdf...
+PDF file: C:\Users\I851396\OneDrive - SAP SE\My Documents\___SAP IE Architect\__Code\UseCaseWebapp\backend\data\SampleData\FieldServiceQuotes.pdf
+
+Extracted text from PDF:
+-----------------------------------
+
+
+Your focus area:
+Area of Improvement
+www.apphaus.sap.com/toolkit/methods
+What process or activity needs to be improved?Why does it need improvement? 
+Example: Creation and access to onboarding informationExample: Information for new hires is all over the place 
+and hard to consume making the onboarding process difficult.
+(Activity / Process)
+WHAT
+WHY
+Who is mainly affected?How could it be improved?
+Example: New hires, managersExample: Onboarding chatbot that answers tailored questions  and 
+ptovides gudance
+WHO
+HOW
+(Role / Department)
+(Current challenges)
+(Ideas for improvement)
+-----------------------------------
+
+Extracted fields:
+-----------------------------------
+Focus Area: Area of Improvement
+Process/Activity: Why does it need improvement? 
+
+and hard to consume making the onboarding process difficult.
+Affected: 
+Improvement Reason: and hard to consume making the onboarding process difficult.
+
+
+
+Who is mainly affected?
+How to Improve: ptovides gudance
+-----------------------------------
+
+Comparison with expected fields:
+-----------------------------------
+Focus Area: NO MATCH
+  Expected: Service call quotation process for field service firm
+  Extracted: Area of Improvement
+Process/Activity: NO MATCH
+  Expected: Have real-time visibility of historical service quotes that could provide a comparison to a current service quote as a sanity check; verify outliers and things that should have been included.
+  Extracted: Why does it need improvement? 
+
+and hard to consume making the onboarding process difficult.
+Affected: NO MATCH
+  Expected: Estimating/Quoting group for field service operation
+  Extracted: 
+Improvement Reason: NO MATCH
+  Expected: Have a prospect that has an abundance of historical information and are not utilizing it to learn from to simplify and standardize quoting process.
+  Extracted: and hard to consume making the onboarding process difficult.
+
+
+
+Who is mainly affected?
+How to Improve: NO MATCH
+  Expected: Agent that could analyze prior service calls and compare to the current service call details to identify any outliers or things that should be included (based on past experience) and are missing to improve speed of quote and properly managing customer's expectations for service.
+  Extracted: ptovides gudance
+-----------------------------------
+
+Field extraction test completed.

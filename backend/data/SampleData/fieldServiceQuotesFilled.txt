@@ -1,0 +1,15 @@
+SAP Area of Improvement Form
+
+Your Focus Area: Service call quotation process for field service firm
+
+What process or activity needs to be improved?
+Have real-time visibility of historical service quotes that could provide a comparison to a current service quote as a sanity check; verify outliers and things that should have been included.
+
+Who is mainly affected?
+Estimating/Quoting group for field service operation
+
+Why does it need improvement?
+Have a prospect that has an abundance of historical information and are not utilizing it to learn from to simplify and standardize quoting process.
+
+How could it be improved?
+Agent that could analyze prior service calls and compare to the current service call details to identify any outliers or things that should be included (based on past experience) and are missing to improve speed of quote and properly managing customer's expectations for service.

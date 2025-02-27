@@ -1,0 +1,15 @@
+SAP Area of Improvement Form
+
+Your Focus Area: ERP
+
+What process or activity needs to be improved?
+Field service quotes generation and approval process
+
+Who is mainly affected?
+Field Service Technicians and Service Managers
+
+Why does it need improvement?
+The current process is manual and time-consuming. Technicians have to fill out paper forms, which then need to be manually entered into the system. This leads to delays in quote generation and approval, resulting in lost business opportunities.
+
+How could it be improved?
+Implement a mobile app that allows technicians to create quotes on-site using predefined templates. The app should integrate with SAP S/4HANA to pull customer data, pricing, and inventory information. It should also include an automated approval workflow for service managers to review and approve quotes quickly.

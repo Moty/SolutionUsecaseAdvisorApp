@@ -1,0 +1,47 @@
+Testing similarity calculation...
+
+Extracted fields:
+-----------------------------------
+Focus Area: ERP
+Process/Activity: I need to quickly find relevant information in a private cloud environment to support internal customers.
+Affected: Finance Support Specialist
+Improvement Reason: Manual search takes too much time, around 10 minutes per query. This delays response to internal customers and reduces productivity.
+How to Improve: Implement a natural language search capability that can understand context and provide faster, more accurate results. Secure access to information in the private cloud environment is essential.
+-----------------------------------
+
+Top 5 Matches:
+-----------------------------------
+1. ERP_01b - SAP S/4HANA Cloud Private Edition, Joule
+   Similarity Score: 0.47
+   Mapped Solution: Joule for SAP S/4HANA Cloud Private Edition
+   Field Scores: Focus Area: 1, Process: 0.07, Affected: 1, Improvement: 0.09, How to Improve: 0.25
+
+2. ERP_01a - SAP S/4HANA Cloud Public Edition, Joule
+   Similarity Score: 0.44
+   Mapped Solution: Joule for SAP S/4HANA Cloud Public Edition
+   Field Scores: Focus Area: 1, Process: 0.03, Affected: 1, Improvement: 0.1, How to Improve: 0.06
+
+3. ERP_08 - SAP ESM, Communication Intelligence
+   Similarity Score: 0.36
+   Mapped Solution: SAP ESM, Communication Intelligence
+   Field Scores: Focus Area: 1, Process: 0, Affected: 0.72, Improvement: 0.04, How to Improve: 0.05
+
+4. ERP_02 - SAP S/4HANA Cloud Private Edition, AI-assisted Behavioral Insights for Contract Accounting
+   Similarity Score: 0.26
+   Mapped Solution: SAP S/4HANA Cloud Private Edition – AI-assisted Behavioral Insights for Contract Accounting
+   Field Scores: Focus Area: 1, Process: 0.05, Affected: 0.2, Improvement: 0.02, How to Improve: 0.02
+
+5. ERP_03 - SAP S/4HANA Cloud Public Edition, Sales Order Auto?Completion
+   Similarity Score: 0.25
+   Mapped Solution: SAP S/4HANA Cloud Public Edition – AI-assisted Sales Order Creation
+   Field Scores: Focus Area: 1, Process: 0.03, Affected: 0.15, Improvement: 0.05, How to Improve: 0.04
+
+-----------------------------------
+
+Best Match:
+-----------------------------------
+Use Case ID: ERP_01b
+Use Case Name: SAP S/4HANA Cloud Private Edition, Joule
+Mapped Solution: Joule for SAP S/4HANA Cloud Private Edition
+Similarity Score: 0.47
+-----------------------------------

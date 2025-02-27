@@ -22,6 +22,7 @@ import FavoritesPanel from './components/FavoritesPanel';
 import ComparisonView from './components/ComparisonView';
 import FilterHistoryPanel from './components/FilterHistoryPanel';
 import DashboardSettings from './components/DashboardSettings';
+import PdfMatcher from './components/PdfMatcher';
 
 // API service
 import { 
@@ -345,6 +346,7 @@ function App() {
               label={`Comparison (${selectedForComparison.length})`} 
               disabled={selectedForComparison.length === 0} 
             />
+            <Tab label="PDF Matcher" />
           </Tabs>
         </Box>
         
@@ -449,6 +451,11 @@ function App() {
                     favorites={favorites}
                     onToggleFavorite={handleToggleFavorite}
                   />
+                )}
+                
+                {/* PDF Matcher Tab */}
+                {activeTab === 3 && (
+                  <PdfMatcher />
                 )}
                 
                 {/* Filter History Drawer */}

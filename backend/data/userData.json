@@ -75,6 +75,17 @@
       },
       "name": "",
       "timestamp": "2025-02-26T23:07:34.814Z"
+    },
+    {
+      "id": "1740676261127",
+      "userId": "default",
+      "filters": {
+        "role": "",
+        "module": "",
+        "keyword": "closing"
+      },
+      "name": "",
+      "timestamp": "2025-02-27T17:11:01.127Z"
     }
   ]
 }
