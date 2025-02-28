@@ -1,0 +1,90 @@
+# Instructions to Install Tesseract OCR on Windows 11
+
+To enable Tesseract OCR for text extraction in your project, please follow the steps below to install Tesseract on your Windows 11 system:
+
+## Step 1: Download the Tesseract Installer
+
+1. **Visit the Official Tesseract Repository:**
+   - Navigate to the [Tesseract at UB Mannheim](https://github.com/UB-Mannheim/tesseract/wiki) GitHub page. This repository provides the latest Windows installers maintained by the University of Mannheim.
+
+2. **Download the Installer:**
+   - On the GitHub page, locate the latest stable release of the Tesseract installer (e.g., `tesseract-5.3.0-win64.exe`).
+   - Click on the installer link to download it to your computer.
+
+## Step 2: Run the Installer
+
+1. **Execute the Installer:**
+   - Locate the downloaded installer file (`tesseract-5.3.0-win64.exe`) in your `Downloads` folder or the directory you chose.
+   - Double-click the installer to run it.
+
+2. **Follow Installation Prompts:**
+   - **License Agreement:** Read and accept the license agreement to proceed.
+   - **Choose Installation Directory:**
+     - The default installation path is typically `C:\Program Files\Tesseract-OCR`. You can leave it as is or choose a different directory.
+   - **Select Components:**
+     - Ensure that the option to add Tesseract to your system's PATH is checked. This allows you to run Tesseract commands from any command prompt.
+
+3. **Complete Installation:**
+   - Click `Install` and wait for the installation process to complete.
+   - Once finished, click `Finish`.
+
+## Step 3: Verify Tesseract Installation
+
+1. **Open Command Prompt:**
+   - Press `Win + R`, type `cmd`, and press `Enter` to open the Command Prompt.
+
+2. **Check Tesseract Version:**
+   - In the Command Prompt, type the following command and press `Enter`:
+     ```
+     tesseract --version
+     ```
+   - You should see output similar to:
+     ```
+     tesseract v5.3.0
+     leptonica-1.82.0
+     libgif 5.1.9 : libjpeg 9c : libpng 1.6.37 : libtiff 4.3.0 : zlib 1.2.11
+     Found AVX2
+     Found AVX
+     Found FMA
+     Found SSE4.1
+     Found SSE4.2
+     ```
+
+## Step 4: Restart VSCode (If Open)
+
+- If you had Visual Studio Code or any other IDE open during the installation, close and reopen it to ensure that the system recognizes the new PATH settings.
+
+## Step 5: Re-run the Special Test Script
+
+1. **Execute the Test Script:**
+   - Open your terminal in VSCode.
+   - Navigate to your project directory if not already there:
+     ```
+     cd c:/Users/I851396/OneDrive - SAP SE/My Documents/___SAP IE Architect/__Code/UseCaseWebapp
+     ```
+   - Run the test script:
+     ```
+     node backend/testFieldServiceQuotesSpecial.js
+     ```
+
+2. **Review Test Results:**
+   - After the script completes, provide the contents of `backend/fieldServiceQuotesSpecialResult.txt` to verify if the similarity score has improved.
+
+## Additional Notes
+
+- **Environment Variables:**
+  - If you did not add Tesseract to your system's PATH during installation, you can manually add it:
+    1. **Open System Properties:**
+       - Press `Win + X` and select `System`.
+    2. **Advanced System Settings:**
+       - Click on `Advanced system settings`.
+    3. **Environment Variables:**
+       - In the `System Properties` window, click on `Environment Variables`.
+    4. **Edit PATH:**
+       - Under `System variables`, find and select the `Path` variable, then click `Edit`.
+    5. **Add Tesseract Path:**
+       - Click `New` and add the path to the Tesseract installation directory (e.g., `C:\Program Files\Tesseract-OCR`).
+    6. **Save Changes:**
+       - Click `OK` on all open dialogs to save the changes.
+
+By following these steps, Tesseract OCR should be successfully installed and integrated into your project environment, enabling effective text extraction from PDF files.

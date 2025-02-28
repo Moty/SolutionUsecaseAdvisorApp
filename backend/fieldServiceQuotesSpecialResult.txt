@@ -1,14 +1,3 @@
-Testing special handling for FieldServiceQuotes.pdf...
-PDF file: C:\Users\I851396\OneDrive - SAP SE\My Documents\___SAP IE Architect\__Code\UseCaseWebapp\backend\data\SampleData\FieldServiceQuotes.pdf
-
-Extracted text from PDF:
------------------------------------
-
-
-
------------------------------------
-
-PDF text is empty or too short, using values from fieldServiceQuotesFilled.txt
 Fields from fieldServiceQuotesFilled.txt:
 -----------------------------------
 Focus Area: Service call quotation process for field service firm
@@ -20,9 +9,6 @@ How to Improve: Agent that could analyze prior service calls and compare to the 
 
 Matching result:
 -----------------------------------
-Message: No close match found. Consider adjusting the similarity threshold or reviewing the PDF content.
-Best candidate: SAP Field Service Management, Equipment Insights
-Similarity score: 0.09
+Matched Use Case: SAP Field Service Management, Service Call Quotation Optimization
+Similarity score: 0.29
 -----------------------------------
-
-Special test completed.

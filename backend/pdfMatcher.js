@@ -2,14 +2,14 @@
  * PDF to Mapped Use Case Matcher
  * 
  * This module provides functionality to match a PDF use case to existing mapped solutions.
- * It extracts text from a PDF file, identifies key fields, and calculates similarity scores
+ * It extracts form fields from a PDF file, identifies key fields, and calculates similarity scores
  * to find the best matching use case from the existing dataset.
  */
 
 const fs = require('fs');
 const path = require('path');
-const pdfParse = require('pdf-parse');
 const natural = require('natural');
+const { PDFDocument } = require('pdf-lib');
 
 /**
  * Main function to match a PDF use case to existing mapped solutions
@@ -18,37 +18,34 @@ const natural = require('natural');
  * @param {string} originalFileName - Original file name (optional)
  * @returns {Object} - Best matching use case with similarity score and extracted fields
  */
-async function matchPdfToUseCase(pdfPath, similarityThreshold = 0.4, originalFileName = '') {
+async function matchPdfToUseCase(pdfPath, similarityThreshold = 0.20, originalFileName = '') {
     try {
         // Log the file being processed
         const fileName = path.basename(pdfPath);
         console.log(`Processing PDF file: ${fileName}, Original name: ${originalFileName || 'N/A'}`);
         
-        // 1. Extract text from PDF
-        const pdfText = await extractTextFromPdf(pdfPath);
+        // 1. Extract fields from PDF form
+        const extractedFields = await extractFormFieldsFromPdf(pdfPath);
         
-        // 2. Extract key fields from the PDF text
-        const extractedFields = extractFieldsFromText(pdfText);
-        
-        // 3. Load existing use cases
+        // 2. Load existing use cases
         const useCases = loadUseCases();
         
-        // 4. Calculate similarity scores
+        // 3. Calculate similarity scores
         const scoredMatches = calculateSimilarityScores(extractedFields, useCases);
         
-        // 5. Find the best match
+        // 4. Find the best match
         const bestMatch = findBestMatch(scoredMatches, similarityThreshold);
         
         // Create the extracted fields object with fallbacks for empty values
         const extractedFieldsObject = {
             focusArea: extractedFields.focusArea || '',
-            process: extractedFields.process || '',
-            affected: extractedFields.affected || '',
-            improvement: extractedFields.improvement || '',
+            process: extractedFields.processToImprove || '',
+            affected: extractedFields.affectedRoles || '',
+            improvement: extractedFields.improvementNeed || '',
             howToImprove: extractedFields.howToImprove || ''
         };
         
-        // 6. Add extracted fields to the result
+        // 5. Add extracted fields to the result
         let result;
         if (bestMatch.message) {
             // No match found - add extracted fields to the response
@@ -75,94 +72,172 @@ async function matchPdfToUseCase(pdfPath, similarityThreshold = 0.4, originalFil
 }
 
 /**
- * Extract text content from a PDF file
+ * Extract form fields from a PDF file using pdf-lib
  * @param {string} pdfPath - Path to the PDF file
- * @returns {string} - Extracted text content
+ * @returns {Object} - Extracted fields
  */
-async function extractTextFromPdf(pdfPath) {
+async function extractFormFieldsFromPdf(pdfPath) {
     try {
-        console.log(`Extracting text from PDF: ${pdfPath}`);
-        const dataBuffer = fs.readFileSync(pdfPath);
+        console.log(`Extracting form fields from PDF: ${pdfPath}`);
         
-        // Add options to get more information from the PDF
-        const options = {
-            // Log PDF structure information
-            pagerender: function(pageData) {
-                console.log(`PDF Page ${pageData.pageIndex + 1} - Size: ${pageData.width}x${pageData.height}`);
-                return pageData.render();
+        // Read the PDF file into a buffer
+        const pdfBytes = fs.readFileSync(pdfPath);
+        
+        // Load the PDF document
+        const pdfDoc = await PDFDocument.load(pdfBytes);
+        
+        // Get the form (AcroForm) from the document
+        const form = pdfDoc.getForm();
+        
+        // Get all form fields
+        const fields = form.getFields();
+        
+        console.log(`Found ${fields.length} form fields in the PDF`);
+        
+        // Extract data from form fields
+        const extractedData = {};
+        
+        fields.forEach(field => {
+            const type = field.constructor.name;
+            const name = field.getName();
+            let value = '';
+            
+            try {
+                if (type === 'PDFTextField') {
+                    value = field.getText() || '';
+                } else if (type === 'PDFCheckBox') {
+                    value = field.isChecked() ? 'Yes' : 'No';
+                } else if (type === 'PDFDropdown') {
+                    value = field.getSelected() || '';
+                } else if (type === 'PDFRadioGroup') {
+                    value = field.getSelected() || '';
+                } else {
+                    // For other field types, try to use getText if available
+                    value = field.getText ? field.getText() : '';
+                }
+            } catch (err) {
+                console.warn(`Error extracting value from field ${name}:`, err.message);
+                value = '';
             }
-        };
-        
-        const data = await pdfParse(dataBuffer, options);
-        
-        // Log PDF metadata
-        console.log('PDF Metadata:', {
-            Pages: data.numpages,
-            Info: data.info,
-            Metadata: data.metadata,
-            Version: data.version
+            
+            extractedData[name] = value;
         });
         
-        // Log the raw text
-        console.log('PDF Raw Text Length:', data.text.length);
-        console.log('PDF Raw Text Preview (first 200 chars):', data.text.substring(0, 200).replace(/\n/g, '\\n'));
+        console.log('Extracted form fields:', extractedData);
         
-        return data.text;
+        // Map form fields to our expected structure
+        return mapFormFieldsToExpectedStructure(extractedData);
     } catch (error) {
-        console.error('Error extracting text from PDF:', error);
-        throw new Error(`PDF parsing failed: ${error.message}`);
+        console.error('Error extracting form fields from PDF:', error);
+        // Return empty fields if extraction fails
+        return {
+            focusArea: '',
+            processToImprove: '',
+            affectedRoles: '',
+            improvementNeed: '',
+            howToImprove: ''
+        };
     }
 }
 
 /**
- * Extract relevant fields from the PDF text
- * @param {string} text - Text content from the PDF
- * @returns {Object} - Extracted fields
+ * Map extracted form fields to the expected structure for similarity calculation
+ * @param {Object} formFields - Raw form fields extracted from the PDF
+ * @returns {Object} - Mapped fields in the expected structure
  */
-function extractFieldsFromText(text) {
-    console.log('Extracting fields from text...');
-    console.log('PDF Text Length:', text.length);
-    console.log('PDF Text Preview (first 500 chars):', text.substring(0, 500));
+function mapFormFieldsToExpectedStructure(formFields) {
+    // Initialize with empty values
+    const mappedFields = {
+        focusArea: '',
+        processToImprove: '',
+        affectedRoles: '',
+        improvementNeed: '',
+        howToImprove: ''
+    };
     
-    // Check if this is a filled form by looking for specific patterns
-    const isFilledForm = checkForFilledForm(text);
-    console.log('Is filled form:', isFilledForm);
-    
-    // Try different extraction strategies based on the form type
-    let fields = {};
-    
-    if (isFilledForm) {
-        // For filled forms, use a more structured approach
-        fields = extractFieldsFromFilledForm(text);
-    } else {
-        // For other forms, use the general extraction approach
-        fields = extractFieldsGeneral(text);
+    // Direct mapping based on the field names found in the PDF
+    if (formFields["Focus Area"]) {
+        mappedFields.focusArea = formFields["Focus Area"];
     }
     
-    // If we still don't have good fields, try the fallback methods
-    if (!hasValidFields(fields)) {
-        console.log('Primary extraction methods failed, trying fallback methods');
+    if (formFields["Process / Activity to Improve"]) {
+        mappedFields.processToImprove = formFields["Process / Activity to Improve"].replace(/\r/g, '');
+    }
+    
+    if (formFields["Affected Roles and Departments"]) {
+        mappedFields.affectedRoles = formFields["Affected Roles and Departments"];
+    }
+    
+    if (formFields["Challenges with Activity"]) {
+        mappedFields.improvementNeed = formFields["Challenges with Activity"];
+    }
+    
+    if (formFields["Ideas for improvement"]) {
+        mappedFields.howToImprove = formFields["Ideas for improvement"].replace(/\r/g, '');
+    }
+    
+    // Fallback to generic field mapping if the specific fields aren't found
+    if (!hasValidFields(mappedFields)) {
+        // Common field names in PDF forms
+        const focusAreaFieldNames = ['FocusArea', 'Focus_Area', 'focus_area', 'focusarea', 'YourFocusArea', 'Focus Area'];
+        const processFieldNames = ['Process', 'ProcessToImprove', 'process_activity', 'WhatProcess', 'ProcessActivity', 'Process / Activity'];
+        const affectedFieldNames = ['Affected', 'WhoAffected', 'affected_roles', 'MainlyAffected', 'AffectedRoles', 'Affected Roles'];
+        const improvementFieldNames = ['ImprovementReason', 'WhyImprovement', 'improvement_reason', 'WhyNeeded', 'Improvement', 'Challenges'];
+        const howToImproveFieldNames = ['HowToImprove', 'how_improve', 'HowCouldBeImproved', 'ImprovementIdea', 'HowImprove', 'Ideas'];
         
-        // Try to find form-like structures in the text
-        const formFields = extractFormFields(text);
-        if (hasValidFields(formFields)) {
-            console.log('Found form-like structure, using extracted form fields');
-            fields = formFields;
-        } else {
-            // If no form structure found, try paragraph-based extraction
-            fields = extractFieldsFromParagraphs(text);
+        // Try to find matching fields for each expected field
+        for (const [fieldName, fieldValue] of Object.entries(formFields)) {
+            const lowerFieldName = fieldName.toLowerCase();
+            
+            // Check for focus area field
+            if (focusAreaFieldNames.some(name => lowerFieldName.includes(name.toLowerCase()))) {
+                mappedFields.focusArea = fieldValue;
+            }
+            // Check for process field
+            else if (processFieldNames.some(name => lowerFieldName.includes(name.toLowerCase()))) {
+                mappedFields.processToImprove = fieldValue;
+            }
+            // Check for affected roles field
+            else if (affectedFieldNames.some(name => lowerFieldName.includes(name.toLowerCase()))) {
+                mappedFields.affectedRoles = fieldValue;
+            }
+            // Check for improvement reason field
+            else if (improvementFieldNames.some(name => lowerFieldName.includes(name.toLowerCase()))) {
+                mappedFields.improvementNeed = fieldValue;
+            }
+            // Check for how to improve field
+            else if (howToImproveFieldNames.some(name => lowerFieldName.includes(name.toLowerCase()))) {
+                mappedFields.howToImprove = fieldValue;
+            }
+        }
+        
+        // If we still couldn't find any fields, try to use a fallback approach
+        if (!hasValidFields(mappedFields) && Object.keys(formFields).length > 0) {
+            // If we have at least 5 fields, try to map them in order
+            const fieldValues = Object.values(formFields);
+            if (fieldValues.length >= 5) {
+                mappedFields.focusArea = fieldValues[0] || '';
+                mappedFields.processToImprove = fieldValues[1] || '';
+                mappedFields.affectedRoles = fieldValues[2] || '';
+                mappedFields.improvementNeed = fieldValues[3] || '';
+                mappedFields.howToImprove = fieldValues[4] || '';
+            }
         }
     }
     
-    // Check for known field values in the text
-    fields = checkForKnownFieldValues(text, fields);
+    // Clean up any carriage returns or other unwanted characters
+    Object.keys(mappedFields).forEach(key => {
+        if (typeof mappedFields[key] === 'string') {
+            mappedFields[key] = mappedFields[key].replace(/\r/g, '').trim();
+        }
+    });
     
-    console.log('Final extracted fields:', fields);
-    return fields;
+    console.log('Mapped fields:', mappedFields);
+    return mappedFields;
 }
 
 /**
- * Check if the text contains valid field values
+ * Check if the fields object contains valid field values
  * @param {Object} fields - Extracted fields
  * @returns {boolean} - True if fields are valid
  */
@@ -170,471 +245,7 @@ function hasValidFields(fields) {
     // Check if we have at least some valid fields
     return fields && 
            Object.keys(fields).length > 0 && 
-           (fields.focusArea || fields.process || fields.affected || fields.improvement || fields.howToImprove);
-}
-
-/**
- * Check if the text appears to be a filled form
- * @param {string} text - Text content
- * @returns {boolean} - True if it appears to be a filled form
- */
-function checkForFilledForm(text) {
-    // Look for patterns that indicate a filled form
-    const filledFormPatterns = [
-        /Service call quotation process/i,
-        /Estimating\/Quoting group/i,
-        /Inventory level optimizer/i,
-        /Purchasing Agent/i,
-        /SAP Area of Improvement Form/i
-    ];
-    
-    return filledFormPatterns.some(pattern => pattern.test(text));
-}
-
-/**
- * Extract fields from a filled form
- * @param {string} text - Text content
- * @returns {Object} - Extracted fields
- */
-function extractFieldsFromFilledForm(text) {
-    console.log('Extracting fields from filled form');
-    
-    // Normalize text to make extraction more reliable
-    const normalizedText = normalizeText(text);
-    
-    // Split the text into sections based on form structure
-    const sections = splitIntoSections(normalizedText);
-    
-    // Extract fields from sections
-    return {
-        focusArea: extractValueAfterLabel(sections, ['Your Focus Area:', 'Focus Area:', 'Your focus area:']),
-        process: extractValueAfterLabel(sections, ['What process or activity needs to be improved?', 'What process or activity']),
-        affected: extractValueAfterLabel(sections, ['Who is mainly affected?', 'Who is affected']),
-        improvement: extractValueAfterLabel(sections, ['Why does it need improvement?', 'Why does it need']),
-        howToImprove: extractValueAfterLabel(sections, ['How could it be improved?', 'How could it be'])
-    };
-}
-
-/**
- * Split text into sections based on form structure
- * @param {string} text - Normalized text content
- * @returns {Object} - Object with sections by field name
- */
-function splitIntoSections(text) {
-  // Define the field labels and their patterns
-  const fieldPatterns = [
-    { name: 'focusArea', patterns: ['Your Focus Area:', 'Focus Area:', 'Your focus area:'] },
-    { name: 'process', patterns: ['What process or activity needs to be improved?', 'What process or activity'] },
-    { name: 'affected', patterns: ['Who is mainly affected?', 'Who is affected'] },
-    { name: 'improvement', patterns: ['Why does it need improvement?', 'Why does it need'] },
-    { name: 'howToImprove', patterns: ['How could it be improved?', 'How could it be'] }
-  ];
-  
-  // Create a map of sections
-  const sections = {};
-  
-  // For each field, find its content in the text
-  for (let i = 0; i < fieldPatterns.length; i++) {
-    const field = fieldPatterns[i];
-    const nextField = i < fieldPatterns.length - 1 ? fieldPatterns[i + 1] : null;
-    
-    // Try each pattern for this field
-    for (const pattern of field.patterns) {
-      const startIndex = text.indexOf(pattern);
-      if (startIndex !== -1) {
-        // Found the start of this field
-        let endIndex = text.length;
-        
-        // If there's a next field, find where it starts
-        if (nextField) {
-          for (const nextPattern of nextField.patterns) {
-            const nextStartIndex = text.indexOf(nextPattern, startIndex + pattern.length);
-            if (nextStartIndex !== -1 && nextStartIndex < endIndex) {
-              endIndex = nextStartIndex;
-            }
-          }
-        }
-        
-        // Extract the content for this field
-        const content = text.substring(startIndex + pattern.length, endIndex).trim();
-        sections[field.name] = content;
-        break;
-      }
-    }
-  }
-  
-  return sections;
-}
-
-/**
- * Extract value after a label from sections
- * @param {Object} sections - Object with sections by field name
- * @param {Array} labels - Possible labels
- * @returns {string} - Extracted value
- */
-function extractValueAfterLabel(sections, labels) {
-    // Find the field name that corresponds to these labels
-    const fieldName = findFieldNameForLabels(labels);
-    
-    // If we have a section for this field, return it
-    if (fieldName && sections[fieldName]) {
-        return cleanupValue(sections[fieldName]);
-    }
-    
-    // Otherwise, try to find the label in any section
-    for (const sectionKey in sections) {
-        const sectionContent = sections[sectionKey];
-        for (const label of labels) {
-            if (sectionContent.includes(label)) {
-                // Extract the text after the label
-                let value = sectionContent.substring(sectionContent.indexOf(label) + label.length);
-                
-                // Clean up the value
-                value = cleanupValue(value);
-                
-                if (value) {
-                    return value;
-                }
-            }
-        }
-    }
-    
-    return '';
-}
-
-/**
- * Find the field name that corresponds to a set of labels
- * @param {Array} labels - Array of label patterns
- * @returns {string|null} - Field name or null if not found
- */
-function findFieldNameForLabels(labels) {
-    // Map of label patterns to field names
-    const labelToFieldMap = {
-        'Your Focus Area:': 'focusArea',
-        'Focus Area:': 'focusArea',
-        'Your focus area:': 'focusArea',
-        'What process or activity needs to be improved?': 'process',
-        'What process or activity': 'process',
-        'Who is mainly affected?': 'affected',
-        'Who is affected': 'affected',
-        'Why does it need improvement?': 'improvement',
-        'Why does it need': 'improvement',
-        'How could it be improved?': 'howToImprove',
-        'How could it be': 'howToImprove'
-    };
-    
-    // Find the first label that maps to a field name
-    for (const label of labels) {
-        if (labelToFieldMap[label]) {
-            return labelToFieldMap[label];
-        }
-    }
-    
-    return null;
-}
-
-/**
- * Find the index of the next label in the text
- * @param {string} text - Text content
- * @param {Array} labels - Possible labels
- * @returns {number} - Index of the next label or -1 if not found
- */
-function findNextLabelIndex(text, labels) {
-    let minIndex = -1;
-    
-    for (const label of labels) {
-        const index = text.indexOf(label);
-        if (index !== -1 && (minIndex === -1 || index < minIndex)) {
-            minIndex = index;
-        }
-    }
-    
-    return minIndex;
-}
-
-/**
- * Clean up an extracted value
- * @param {string} value - Extracted value
- * @returns {string} - Cleaned value
- */
-function cleanupValue(value) {
-    // Remove any leading/trailing whitespace
-    value = value.trim();
-    
-    // Remove any example text
-    value = value.replace(/Example:.*$/mg, '').trim();
-    value = value.replace(/Example .*$/mg, '').trim();
-    
-    // Remove labels and placeholders
-    value = value.replace(/\(Activity \/ Process\)/g, '').trim();
-    value = value.replace(/\(Role \/ Department\)/g, '').trim();
-    value = value.replace(/\(Current challenges\)/g, '').trim();
-    value = value.replace(/\(Ideas for improvement\)/g, '').trim();
-    value = value.replace(/WHAT|WHO|WHY|HOW/g, '').trim();
-    
-    // Clean up any URLs
-    value = value.replace(/www\.apphaus\.sap\.com\/toolkit\/methods/g, '').trim();
-    
-    // Remove form field labels that might be included in the extracted text
-    value = value.replace(/Your focus area:/gi, '').trim();
-    value = value.replace(/Focus Area:/gi, '').trim();
-    value = value.replace(/What process or activity needs to be improved\??/gi, '').trim();
-    value = value.replace(/Who is mainly affected\??/gi, '').trim();
-    value = value.replace(/Why does it need improvement\??/gi, '').trim();
-    value = value.replace(/How could it be improved\??/gi, '').trim();
-    
-    // Remove common form template values
-    value = value.replace(/Area of Improvement/gi, '').trim();
-    
-    // Remove any remaining form artifacts
-    value = value.replace(/Creation and access to onboarding information/gi, '').trim();
-    value = value.replace(/Information for new hires is all over the place/gi, '').trim();
-    value = value.replace(/and hard to consume making the onboarding process difficult/gi, '').trim();
-    value = value.replace(/New hires managers/gi, '').trim();
-    value = value.replace(/Onboarding chatbot that answers tailored questions/gi, '').trim();
-    value = value.replace(/and ptovides gudance/gi, '').trim();
-    
-    return value;
-}
-
-/**
- * Extract fields using the general approach
- * @param {string} text - Text content
- * @returns {Object} - Extracted fields
- */
-function extractFieldsGeneral(text) {
-    console.log('Extracting fields using general approach');
-    
-    // Normalize text to make extraction more reliable
-    const normalizedText = normalizeText(text);
-    
-    // Define patterns to extract key fields based on form structure
-    // Use multiple possible field names to increase chances of matching
-    return {
-        focusArea: extractField(normalizedText, ['Your [Ff]ocus [Aa]rea', '[Ff]ocus [Aa]rea', 'Focus Area:'], 
-                               ['What process', 'WHAT', 'What process or activity']),
-        process: extractField(normalizedText, ['What process or activity needs to be improved', 'What process or activity', 'WHAT'], 
-                             ['Who is mainly', 'WHO', 'Who is mainly affected']),
-        affected: extractField(normalizedText, ['Who is mainly affected', 'Who is affected', 'WHO'], 
-                              ['Why does it need', 'WHY', 'Why does it need improvement']),
-        improvement: extractField(normalizedText, ['Why does it need improvement', 'Why improve', 'WHY'], 
-                                 ['How could it be', 'HOW', 'How could it be improved']),
-        howToImprove: extractField(normalizedText, ['How could it be improved', 'How to improve', 'HOW'], [])
-    };
-}
-
-/**
- * Extract fields from paragraphs
- * @param {string} text - Text content
- * @returns {Object} - Extracted fields
- */
-function extractFieldsFromParagraphs(text) {
-    console.log('Extracting fields from paragraphs');
-    
-    // Split the text into paragraphs
-    const paragraphs = text.split(/\n\s*\n/).filter(p => p.trim().length > 0);
-    console.log('Found', paragraphs.length, 'paragraphs');
-    
-    const fields = {
-        focusArea: '',
-        process: '',
-        affected: '',
-        improvement: '',
-        howToImprove: ''
-    };
-    
-    if (paragraphs.length > 0) {
-        fields.focusArea = paragraphs[0].substring(0, 100).trim();
-        
-        if (paragraphs.length > 1) {
-            fields.process = paragraphs[1].substring(0, 200).trim();
-        }
-        
-        if (paragraphs.length > 2) {
-            fields.affected = paragraphs[2].substring(0, 100).trim();
-        }
-        
-        if (paragraphs.length > 3) {
-            fields.improvement = paragraphs[3].substring(0, 200).trim();
-        }
-        
-        if (paragraphs.length > 4) {
-            fields.howToImprove = paragraphs[4].substring(0, 200).trim();
-        }
-    }
-    
-    return fields;
-}
-
-/**
- * Check for known field values in the text
- * @param {string} text - Text content
- * @param {Object} fields - Current fields
- * @returns {Object} - Updated fields
- */
-function checkForKnownFieldValues(text, fields) {
-    // Check for known field values in the text
-    const knownValues = [
-        {
-            pattern: /Service call quotation process for field service firm/i,
-            field: 'focusArea',
-            value: 'Service call quotation process for field service firm'
-        },
-        {
-            pattern: /Have real-time visibility of historical service quotes/i,
-            field: 'process',
-            value: 'Have real-time visibility of historical service quotes that could provide a comparison to a current service quote as a sanity check; verify outliers and things that should have been included.'
-        },
-        {
-            pattern: /Estimating\/Quoting group for field service operation/i,
-            field: 'affected',
-            value: 'Estimating/Quoting group for field service operation'
-        },
-        {
-            pattern: /Have a prospect that has an abundance of historical information/i,
-            field: 'improvement',
-            value: 'Have a prospect that has an abundance of historical information and are not utilizing it to learn from to simplify and standardize quoting process.'
-        },
-        {
-            pattern: /Agent that could analyze prior service calls/i,
-            field: 'howToImprove',
-            value: 'Agent that could analyze prior service calls and compare to the current service call details to identify any outliers or things that should be included (based on past experience) and are missing to improve speed of quote and properly managing customer\'s expectations for service.'
-        },
-        {
-            pattern: /Inventory level optimizer/i,
-            field: 'focusArea',
-            value: 'Inventory level optimizer'
-        },
-        {
-            pattern: /Purchasing Agent/i,
-            field: 'focusArea',
-            value: 'Purchasing Agent'
-        }
-    ];
-    
-    // Check each known value
-    for (const knownValue of knownValues) {
-        if (knownValue.pattern.test(text)) {
-            // If the field is empty or the known value is more specific, use the known value
-            if (!fields[knownValue.field] || fields[knownValue.field].length < knownValue.value.length) {
-                fields[knownValue.field] = knownValue.value;
-            }
-        }
-    }
-    
-    return fields;
-}
-
-/**
- * Normalize text to make extraction more reliable
- * @param {string} text - Original text content
- * @returns {string} - Normalized text
- */
-function normalizeText(text) {
-    // Replace multiple spaces with a single space
-    let normalized = text.replace(/\s+/g, ' ');
-    
-    // Replace common Unicode characters
-    normalized = normalized.replace(/[\u2018\u2019]/g, "'"); // Smart quotes
-    normalized = normalized.replace(/[\u201C\u201D]/g, '"'); // Smart double quotes
-    normalized = normalized.replace(/\u2013/g, '-'); // En dash
-    normalized = normalized.replace(/\u2014/g, '--'); // Em dash
-    normalized = normalized.replace(/\u2026/g, '...'); // Ellipsis
-    
-    // Normalize line breaks
-    normalized = normalized.replace(/\r\n/g, '\n');
-    
-    // Remove form artifacts
-    normalized = normalized.replace(/www\.apphaus\.sap\.com\/toolkit\/methods/g, '');
-    normalized = normalized.replace(/Example:/g, '');
-    
-    return normalized;
-}
-
-/**
- * Try to extract form fields from text that has a form-like structure
- * @param {string} text - Normalized text content
- * @returns {Object} - Extracted form fields
- */
-function extractFormFields(text) {
-    const fields = {};
-    
-    // Look for patterns like "Field name: Field value" or "Field name - Field value"
-    const formFieldRegex = /([^:.\n-]+)[:.-]\s*([^.\n]+)/g;
-    let match;
-    
-    while ((match = formFieldRegex.exec(text)) !== null) {
-        const fieldName = match[1].trim().toLowerCase();
-        const fieldValue = match[2].trim();
-        
-        if (fieldValue.length > 0) {
-            // Map common field names to our standard field names
-            if (fieldName.includes('focus') || fieldName.includes('area')) {
-                fields.focusArea = fieldValue;
-            } else if (fieldName.includes('process') || fieldName.includes('activity') || fieldName.includes('what')) {
-                fields.process = fieldValue;
-            } else if (fieldName.includes('who') || fieldName.includes('affected')) {
-                fields.affected = fieldValue;
-            } else if (fieldName.includes('why') || fieldName.includes('need') || fieldName.includes('improvement')) {
-                fields.improvement = fieldValue;
-            } else if (fieldName.includes('how') || fieldName.includes('improve')) {
-                fields.howToImprove = fieldValue;
-            }
-        }
-    }
-    
-    return fields;
-}
-
-/**
- * Extract a specific field from text
- * @param {string} text - Full text content
- * @param {Array} fieldNames - Array of possible field name patterns to match
- * @param {Array} nextFields - Array of field names that might follow this field
- * @returns {string} - Extracted field content
- */
-function extractField(text, fieldNames, nextFields) {
-  try {
-    console.log(`Attempting to extract field with patterns:`, fieldNames);
-    
-    // Try each field name pattern until we find a match
-    for (const fieldName of fieldNames) {
-      // Create a regex pattern to match the field and its content
-      let pattern;
-      
-      if (nextFields.length > 0) {
-        // If we have next fields, use them as boundaries
-        const nextFieldsPattern = nextFields.join('|');
-        pattern = new RegExp(`(${fieldName})[^a-zA-Z0-9]?[\\s\\S]*?(?=${nextFieldsPattern}|$)`, 'i');
-      } else {
-        // If no next fields, match until the end
-        pattern = new RegExp(`(${fieldName})[^a-zA-Z0-9]?[\\s\\S]*`, 'i');
-      }
-      
-      const match = text.match(pattern);
-      
-      if (match && match[0]) {
-        // Remove the field name and clean up the extracted text
-        let content = match[0];
-        
-        // Remove the field name
-        content = content.replace(new RegExp(`^${fieldName}[^a-zA-Z0-9]?`, 'i'), '');
-        
-        // Clean up the value
-        content = cleanupValue(content);
-        
-        console.log(`Successfully extracted with pattern "${fieldName}":`, content);
-        
-        return content;
-      }
-    }
-    
-    console.log(`No match found for any field patterns`);
-    return '';
-  } catch (error) {
-    console.error(`Error extracting field:`, error);
-    return '';
-  }
+           (fields.focusArea || fields.processToImprove || fields.affectedRoles || fields.improvementNeed || fields.howToImprove);
 }
 
 /**
@@ -661,27 +272,28 @@ function loadUseCases() {
 function calculateSimilarityScores(extractedFields, useCases) {
     // Field weights (can be adjusted based on importance)
     const weights = {
-        focusArea: 0.2,
-        process: 0.25,
-        affected: 0.2,
-        improvement: 0.25,
-        howToImprove: 0.1
+        focusArea: 0.35,          // Further increased weight for focusArea
+        process: 0.30,            // Increased weight for process
+        affected: 0.25,           // Maintained weight for affected
+        improvement: 0.05,        // Reduced weight for improvement
+        howToImprove: 0.05        // Maintained reduced weight for howToImprove
     };
     
     // Calculate similarity scores for each use case
     const scoredMatches = useCases.map(useCase => {
-        // Extract module from Use Case ID
-        const useCaseModule = useCase['Use Case ID'].split('_')[0];
-        
+        // Extract relevant fields from the use case
+        const useCaseFocusArea = useCase['Mapped Solution']; 
+        const useCaseProcess = useCase['Challenge'];       
+        const useCaseAffected = useCase['User Role'];      
+        const useCaseImprovement = useCase['Enablers'];    
+        const useCaseHowToImprove = useCase['Key Benefits']; 
+    
         // Calculate field-level similarities
-        const focusAreaSim = calculateStringSimilarity(extractedFields.focusArea, useCaseModule);
-        const processSim = calculateStringSimilarity(extractedFields.process, useCase['Use Case Name']);
-        const affectedSim = calculateStringSimilarity(extractedFields.affected, useCase['User Role']);
-        const improvementSim = calculateStringSimilarity(extractedFields.improvement, useCase['Challenge']);
-        const howToImproveSim = calculateStringSimilarity(
-            extractedFields.howToImprove, 
-            `${useCase['Enablers']} ${useCase['Key Benefits']}`
-        );
+        const focusAreaSim = calculateStringSimilarity(extractedFields.focusArea, useCaseFocusArea);
+        const processSim = calculateStringSimilarity(extractedFields.processToImprove, useCaseProcess);
+        const affectedSim = calculateStringSimilarity(extractedFields.affectedRoles, useCaseAffected);
+        const improvementSim = calculateStringSimilarity(extractedFields.improvementNeed, useCaseImprovement);
+        const howToImproveSim = calculateStringSimilarity(extractedFields.howToImprove, useCaseHowToImprove);
         
         // Calculate weighted similarity score
         const similarityScore = (
@@ -773,7 +385,7 @@ function calculateCosineSimilarity(tfidf, doc1Index, doc2Index) {
  * Find the best matching use case based on similarity scores
  * @param {Array} scoredMatches - Use cases with similarity scores
  * @param {number} threshold - Minimum similarity score to consider a match
- * @returns {Object} - Best matching use case or null if no match found
+ * @returns {Object} - Best matching use case or message if no match found
  */
 function findBestMatch(scoredMatches, threshold) {
     if (scoredMatches.length === 0) {
