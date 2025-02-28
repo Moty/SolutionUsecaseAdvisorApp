@@ -21,5 +21,51 @@
     },
     "pdfFileName": "DFindlay_AreaOfImprovement_Form.pdf",
     "notes": ""
+  },
+  {
+    "id": "NEW_002",
+    "timestamp": "2025-02-28T14:40:02.023Z",
+    "status": "pending",
+    "extractedFields": {
+      "focusArea": "Royalty Ownership disbursements and analytics",
+      "process": "Have visibility to real-time royalty payment data for owners ex. Company owns a gas producing property and they have 10 royalty owners in that property. Each with different percentages in ownership. Need to quickly respond and report to corporate exact royalty disbursements to owner or owners by ownership percentage and understand the possible royalty payments by date.",
+      "affected": "Finance/Treasury",
+      "improvement": "It takes weeks to fully understand what the royalty revenue is and how much disbursements should be made by ownership percentage.",
+      "howToImprove": "Royalty chatbox that answers specific questions of payments being received and what percentage goes to owners and provide suggested amounts for forecasting of final revenue numbers..Also, maybe some what-if's about if a new Owner decided to invest in the property what would their disbursements look like based on their percentage ownership and recent historic revenue data."
+    },
+    "mappedFields": {
+      "UseCaseName": "",
+      "UserRole": "Finance/Treasury",
+      "Challenge": "It takes weeks to fully understand what the royalty revenue is and how much disbursements should be made by ownership percentage.",
+      "Enablers": "",
+      "KeyBenefits": "",
+      "MappedSolution": "",
+      "UseCaseID": "NEW_002"
+    },
+    "pdfFileName": "OwnerRoyalty.pdf",
+    "notes": ""
+  },
+  {
+    "id": "NEW_003",
+    "timestamp": "2025-02-28T16:28:43.601Z",
+    "status": "pending",
+    "extractedFields": {
+      "focusArea": "Service call quotation process for field service firm",
+      "process": "Have real-time visibility of historical service quotes that could provide a comparison to a current service quote as a sanity check; verify outliers and things that should have been included.",
+      "affected": "Estimating/Quoting group for field service operation",
+      "improvement": "Have a prospect that has an abundance of historical information and are not utilizing it to learn from to simplify and standardize quoting process.",
+      "howToImprove": "Agent that could analyze prior service calls and compare to the current service call details to identify any outliers or things that should be included (based on past experience) and are missing to improve speed of quote and properly managing customer's expectations for service."
+    },
+    "mappedFields": {
+      "UseCaseName": "",
+      "UserRole": "Estimating/Quoting group for field service operation",
+      "Challenge": "Have a prospect that has an abundance of historical information and are not utilizing it to learn from to simplify and standardize quoting process.",
+      "Enablers": "",
+      "KeyBenefits": "",
+      "MappedSolution": "",
+      "UseCaseID": "NEW_003"
+    },
+    "pdfFileName": "FieldServiceQuotes.pdf",
+    "notes": ""
   }
 ]
