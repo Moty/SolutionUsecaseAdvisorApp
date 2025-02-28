@@ -20,6 +20,7 @@ import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
+import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import axios from 'axios';
 
 /**
@@ -256,20 +257,70 @@ const NewUseCasesList = () => {
     }
   };
 
+  // Handle export to CSV
+  const handleExport = () => {
+    if (useCases.length === 0) {
+      alert('No use cases to export');
+      return;
+    }
+    
+    setLoading(true);
+    
+    // Use axios instead of direct window.location
+    axios({
+      url: '/api/export-new-use-cases',
+      method: 'GET',
+      responseType: 'blob', // Important for handling file downloads
+    })
+      .then((response) => {
+        // Create a URL for the blob
+        const url = window.URL.createObjectURL(new Blob([response.data]));
+        
+        // Create a temporary link element
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', 'new-use-cases.csv');
+        
+        // Append to the document, click it, and remove it
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      })
+      .catch((error) => {
+        console.error('Error downloading CSV:', error);
+        setError('Failed to download CSV file. Please try again.');
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  };
+
   return (
     <Paper elevation={3} sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
         <Typography variant="h6">
           New Use Cases Repository
         </Typography>
-        <Button 
-          variant="outlined" 
-          size="small" 
-          onClick={handleRefresh}
-          disabled={loading}
-        >
-          Refresh
-        </Button>
+        <Box>
+          <Button 
+            variant="outlined" 
+            size="small" 
+            startIcon={<FileDownloadIcon />}
+            onClick={handleExport}
+            sx={{ mr: 1 }}
+            disabled={useCases.length === 0 || loading}
+          >
+            Export CSV
+          </Button>
+          <Button 
+            variant="outlined" 
+            size="small" 
+            onClick={handleRefresh}
+            disabled={loading}
+          >
+            Refresh
+          </Button>
+        </Box>
       </Box>
       
       {error && (

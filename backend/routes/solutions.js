@@ -550,6 +550,55 @@ router.get('/new-use-cases', (req, res) => {
 });
 
 /**
+ * GET /api/export-new-use-cases - Export new use cases as CSV
+ */
+router.get('/export-new-use-cases', (req, res) => {
+  try {
+    const newUseCases = loadNewUseCases();
+    
+    if (newUseCases.length === 0) {
+      return res.status(404).json({ message: 'No new use cases found' });
+    }
+    
+    // Prepare data for CSV export by flattening the nested structure
+    const flattenedData = newUseCases.map(useCase => ({
+      'ID': useCase.id,
+      'Name': useCase.mappedFields.UseCaseName,
+      'User Role': useCase.mappedFields.UserRole,
+      'Status': useCase.status,
+      'Created Date': new Date(useCase.timestamp).toLocaleDateString(),
+      'Challenge': useCase.mappedFields.Challenge,
+      'Enablers': useCase.mappedFields.Enablers,
+      'Key Benefits': useCase.mappedFields.KeyBenefits,
+      'Mapped Solution': useCase.mappedFields.MappedSolution,
+      'Focus Area': useCase.extractedFields.focusArea,
+      'Process': useCase.extractedFields.process,
+      'Affected Users': useCase.extractedFields.affected,
+      'Improvement Reason': useCase.extractedFields.improvement,
+      'How to Improve': useCase.extractedFields.howToImprove,
+      'PDF Filename': useCase.pdfFileName,
+      'Notes': useCase.notes
+    }));
+    
+    // Define fields for CSV
+    const fields = Object.keys(flattenedData[0] || {});
+    
+    // Convert to CSV
+    const json2csvParser = new Parser({ fields });
+    const csv = json2csvParser.parse(flattenedData);
+    
+    // Set headers for CSV download
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename=new-use-cases.csv');
+    
+    res.send(csv);
+  } catch (error) {
+    console.error('Error exporting new use cases:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+/**
  * POST /api/new-use-cases - Save a new use case
  */
 router.post('/new-use-cases', express.json(), (req, res) => {
