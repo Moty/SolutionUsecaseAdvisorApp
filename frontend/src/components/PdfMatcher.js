@@ -353,12 +353,56 @@ const PdfMatcher = () => {
                             <Typography variant="body2" color="text.secondary" paragraph>
                               ID: {result.bestCandidate.UseCaseID}
                             </Typography>
-                            <Typography variant="body1">
-                              Similarity Score: {result.bestCandidate.SimilarityScore}
-                            </Typography>
-                            <Typography variant="body1">
-                              Mapped Solution: {result.bestCandidate.MappedSolution}
-                            </Typography>
+                            <Box sx={{ mt: 2 }}>
+                              <Typography variant="subtitle1">Similarity Score:</Typography>
+                              <Typography variant="body1">{result.bestCandidate.SimilarityScore}</Typography>
+                            </Box>
+                            <Box sx={{ mt: 2 }}>
+                              <Typography variant="subtitle1">Mapped Solution:</Typography>
+                              <Typography variant="body1">{result.bestCandidate.MappedSolution}</Typography>
+                            </Box>
+                            {result.bestCandidate.Challenge && (
+                              <Box sx={{ mt: 2 }}>
+                                <Typography variant="subtitle1">Challenge:</Typography>
+                                <Typography variant="body1">{result.bestCandidate.Challenge}</Typography>
+                              </Box>
+                            )}
+                            {result.bestCandidate.UserRole && (
+                              <Box sx={{ mt: 2 }}>
+                                <Typography variant="subtitle1">User Role:</Typography>
+                                <Typography variant="body1">{result.bestCandidate.UserRole}</Typography>
+                              </Box>
+                            )}
+                            {result.bestCandidate.ValueDrivers && (
+                              <Box sx={{ mt: 2 }}>
+                                <Typography variant="subtitle1">Value Drivers:</Typography>
+                                <Typography variant="body1">{result.bestCandidate.ValueDrivers}</Typography>
+                              </Box>
+                            )}
+                            {result.bestCandidate.Enablers && (
+                              <Box sx={{ mt: 2 }}>
+                                <Typography variant="subtitle1">Enablers:</Typography>
+                                <Typography variant="body1">{result.bestCandidate.Enablers}</Typography>
+                              </Box>
+                            )}
+                            {result.bestCandidate.BaselineWithoutAI && (
+                              <Box sx={{ mt: 2 }}>
+                                <Typography variant="subtitle1">Baseline without AI:</Typography>
+                                <Typography variant="body1">{result.bestCandidate.BaselineWithoutAI}</Typography>
+                              </Box>
+                            )}
+                            {result.bestCandidate.NewWorldWithAI && (
+                              <Box sx={{ mt: 2 }}>
+                                <Typography variant="subtitle1">New World (with AI):</Typography>
+                                <Typography variant="body1">{result.bestCandidate.NewWorldWithAI}</Typography>
+                              </Box>
+                            )}
+                            {result.bestCandidate.KeyBenefits && (
+                              <Box sx={{ mt: 2 }}>
+                                <Typography variant="subtitle1">Key Benefits:</Typography>
+                                <Typography variant="body1">{result.bestCandidate.KeyBenefits}</Typography>
+                              </Box>
+                            )}
                           </Paper>
                         </Grid>
                       </Grid>
@@ -408,10 +452,28 @@ const PdfMatcher = () => {
                                 <Typography variant="body1">{result.UserRole}</Typography>
                               </Box>
                             )}
+                            {result.ValueDrivers && (
+                              <Box sx={{ mt: 2 }}>
+                                <Typography variant="subtitle1">Value Drivers:</Typography>
+                                <Typography variant="body1">{result.ValueDrivers}</Typography>
+                              </Box>
+                            )}
                             {result.Enablers && (
                               <Box sx={{ mt: 2 }}>
                                 <Typography variant="subtitle1">Enablers:</Typography>
                                 <Typography variant="body1">{result.Enablers}</Typography>
+                              </Box>
+                            )}
+                            {result.BaselineWithoutAI && (
+                              <Box sx={{ mt: 2 }}>
+                                <Typography variant="subtitle1">Baseline without AI:</Typography>
+                                <Typography variant="body1">{result.BaselineWithoutAI}</Typography>
+                              </Box>
+                            )}
+                            {result.NewWorldWithAI && (
+                              <Box sx={{ mt: 2 }}>
+                                <Typography variant="subtitle1">New World (with AI):</Typography>
+                                <Typography variant="body1">{result.NewWorldWithAI}</Typography>
                               </Box>
                             )}
                             {result.KeyBenefits && (

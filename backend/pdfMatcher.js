@@ -304,11 +304,20 @@ function calculateSimilarityScores(extractedFields, useCases) {
             weights.howToImprove * howToImproveSim
         );
         
+        // Store the full use case data along with the similarity score
         return {
             UseCaseID: useCase['Use Case ID'],
             UseCaseName: useCase['Use Case Name'],
             MappedSolution: useCase['Mapped Solution'],
-            SimilarityScore: parseFloat(similarityScore.toFixed(2))
+            Challenge: useCase['Challenge'],
+            UserRole: useCase['User Role'],
+            ValueDrivers: useCase['Value Drivers'],
+            Enablers: useCase['Enablers'],
+            BaselineWithoutAI: useCase['Baseline without AI'],
+            NewWorldWithAI: useCase['New World (with AI)'],
+            KeyBenefits: useCase['Key Benefits'],
+            SimilarityScore: parseFloat(similarityScore.toFixed(2)),
+            originalUseCase: useCase // Store the original use case for reference
         };
     });
     
