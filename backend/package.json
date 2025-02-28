@@ -1,5 +1,5 @@
 {
-  "name": "sap-solution-advisor-backend",
+  "name": "solution-usecase-advisor-backend",
   "version": "1.0.0",
   "description": "Backend for SAP Solution Advisor Webapp",
   "main": "server.js",
