@@ -1,1 +1,25 @@
-[]
+[
+  {
+    "id": "NEW_001",
+    "timestamp": "2025-02-28T02:14:15.275Z",
+    "status": "pending",
+    "extractedFields": {
+      "focusArea": "",
+      "process": "Report out production planning master data required to support finite capacity planning; hourly production rate, lot size rules, daily volume based on work center available capacity",
+      "affected": "MPS Supply planners\n\nProduction planners\nProduction Supervisors",
+      "improvement": "requires multiple manual SAP table extracts, and manually consolidation in excel to report out planning data based on user defined display format.",
+      "howToImprove": "Automate Evalution of MPS supply plan expected volume with  SAP production planning master accuracy required to produced expected result and identify gaps"
+    },
+    "mappedFields": {
+      "UseCaseName": "Production Order Automation",
+      "UserRole": "MPS Supply planners\n\nProduction planners\nProduction Supervisors",
+      "Challenge": "requires multiple manual SAP table extracts, and manually consolidation in excel to report out planning data based on user defined display format.",
+      "Enablers": "requires multiple manual SAP table extracts, and manually consolidation in excel to report out planning data based on user defined display format.",
+      "KeyBenefits": "Automate Evalution of MPS supply plan expected volume with  SAP production planning master accuracy required to produced expected result and identify gaps",
+      "MappedSolution": "None",
+      "UseCaseID": "NEW_001"
+    },
+    "pdfFileName": "DFindlay_AreaOfImprovement_Form.pdf",
+    "notes": ""
+  }
+]

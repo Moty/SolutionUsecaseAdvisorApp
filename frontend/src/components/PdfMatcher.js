@@ -14,13 +14,15 @@ import {
   Alert,
   AlertTitle,
   Tabs,
-  Tab
+  Tab,
+  Link
 } from '@mui/material';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import DescriptionIcon from '@mui/icons-material/Description';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ErrorIcon from '@mui/icons-material/Error';
 import SaveIcon from '@mui/icons-material/Save';
+import DownloadIcon from '@mui/icons-material/Download';
 import { styled } from '@mui/material/styles';
 import axios from 'axios';
 
@@ -50,6 +52,19 @@ const HiddenInput = styled('input')({
 const ResultCard = styled(Card)(({ theme }) => ({
   marginTop: theme.spacing(4),
   boxShadow: theme.shadows[3]
+}));
+
+const TemplateLink = styled(Link)(({ theme }) => ({
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  margin: theme.spacing(2, 0),
+  padding: theme.spacing(1),
+  borderRadius: theme.shape.borderRadius,
+  backgroundColor: theme.palette.background.paper,
+  '&:hover': {
+    backgroundColor: theme.palette.action.hover
+  }
 }));
 
 /**
@@ -204,7 +219,7 @@ const PdfMatcher = () => {
         {/* Tabs */}
         <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
           <Tabs value={tabValue} onChange={handleTabChange} aria-label="pdf matcher tabs">
-            <Tab label="Match PDF" />
+            <Tab label="Solution Matching" />
             <Tab label="New Use Cases" />
           </Tabs>
         </Box>
@@ -212,8 +227,19 @@ const PdfMatcher = () => {
         {/* Match PDF Tab */}
         {tabValue === 0 && (
           <Box>
+            {/* Template Download Link */}
+            <TemplateLink 
+              href="/AreaOfImprovement_Empty_Form.pdf" 
+              download="SAP_Area_Of_Improvement_Template.pdf"
+              underline="none"
+              color="primary"
+            >
+              <DownloadIcon sx={{ mr: 1 }} />
+              <Typography variant="body1">Download Empty Form Template</Typography>
+            </TemplateLink>
+
             {/* File Upload Area */}
-            <Box sx={{ mt: 4 }}>
+            <Box sx={{ mt: 2 }}>
               <HiddenInput
                 id="pdf-upload"
                 type="file"
@@ -288,13 +314,6 @@ const PdfMatcher = () => {
               </Button>
             </Box>
 
-            {/* Extracted Fields */}
-            {result && (
-              <Box sx={{ mt: 4 }}>
-                <ExtractedFieldsDisplay extractedFields={result.extractedFields || {}} />
-              </Box>
-            )}
-
             {/* Results */}
             {result && (
               <ResultCard>
@@ -317,17 +336,32 @@ const PdfMatcher = () => {
                         </Button>
                       </Box>
                       <Divider sx={{ my: 2 }} />
-                      <Typography variant="subtitle1">Best Candidate:</Typography>
-                      <Typography variant="h6">{result.bestCandidate.UseCaseName}</Typography>
-                      <Typography variant="body2" color="text.secondary" paragraph>
-                        ID: {result.bestCandidate.UseCaseID}
-                      </Typography>
-                      <Typography variant="body1">
-                        Similarity Score: {result.bestCandidate.SimilarityScore}
-                      </Typography>
-                      <Typography variant="body1">
-                        Mapped Solution: {result.bestCandidate.MappedSolution}
-                      </Typography>
+                      
+                      {/* Side-by-side comparison for no match */}
+                      <Grid container spacing={3}>
+                        {/* Left side: Extracted fields */}
+                        <Grid item xs={12} md={6}>
+                          <Typography variant="h6" gutterBottom>Extracted Fields</Typography>
+                          <ExtractedFieldsDisplay extractedFields={result.extractedFields || {}} />
+                        </Grid>
+                        
+                        {/* Right side: Best candidate */}
+                        <Grid item xs={12} md={6}>
+                          <Typography variant="h6" gutterBottom>Best Candidate</Typography>
+                          <Paper elevation={3} sx={{ p: 2, height: '100%' }}>
+                            <Typography variant="h6">{result.bestCandidate.UseCaseName}</Typography>
+                            <Typography variant="body2" color="text.secondary" paragraph>
+                              ID: {result.bestCandidate.UseCaseID}
+                            </Typography>
+                            <Typography variant="body1">
+                              Similarity Score: {result.bestCandidate.SimilarityScore}
+                            </Typography>
+                            <Typography variant="body1">
+                              Mapped Solution: {result.bestCandidate.MappedSolution}
+                            </Typography>
+                          </Paper>
+                        </Grid>
+                      </Grid>
                     </Box>
                   ) : (
                     // Match found
@@ -337,18 +371,56 @@ const PdfMatcher = () => {
                         <Typography variant="h6">Match Found!</Typography>
                       </Box>
                       <Divider sx={{ my: 2 }} />
-                      <Typography variant="h5">{result.UseCaseName}</Typography>
-                      <Typography variant="body2" color="text.secondary" paragraph>
-                        ID: {result.UseCaseID}
-                      </Typography>
-                      <Grid container spacing={2}>
-                        <Grid item xs={12} sm={6}>
-                          <Typography variant="subtitle1">Similarity Score:</Typography>
-                          <Typography variant="body1">{result.SimilarityScore}</Typography>
+                      
+                      {/* Side-by-side comparison for match found */}
+                      <Grid container spacing={3}>
+                        {/* Left side: Extracted fields */}
+                        <Grid item xs={12} md={6}>
+                          <Typography variant="h6" gutterBottom>Extracted Fields</Typography>
+                          <ExtractedFieldsDisplay extractedFields={result.extractedFields || {}} />
                         </Grid>
-                        <Grid item xs={12} sm={6}>
-                          <Typography variant="subtitle1">Mapped Solution:</Typography>
-                          <Typography variant="body1">{result.MappedSolution}</Typography>
+                        
+                        {/* Right side: Matched use case */}
+                        <Grid item xs={12} md={6}>
+                          <Typography variant="h6" gutterBottom>Matched Use Case</Typography>
+                          <Paper elevation={3} sx={{ p: 2, height: '100%' }}>
+                            <Typography variant="h6">{result.UseCaseName}</Typography>
+                            <Typography variant="body2" color="text.secondary" paragraph>
+                              ID: {result.UseCaseID}
+                            </Typography>
+                            <Box sx={{ mt: 2 }}>
+                              <Typography variant="subtitle1">Similarity Score:</Typography>
+                              <Typography variant="body1">{result.SimilarityScore}</Typography>
+                            </Box>
+                            <Box sx={{ mt: 2 }}>
+                              <Typography variant="subtitle1">Mapped Solution:</Typography>
+                              <Typography variant="body1">{result.MappedSolution}</Typography>
+                            </Box>
+                            {result.Challenge && (
+                              <Box sx={{ mt: 2 }}>
+                                <Typography variant="subtitle1">Challenge:</Typography>
+                                <Typography variant="body1">{result.Challenge}</Typography>
+                              </Box>
+                            )}
+                            {result.UserRole && (
+                              <Box sx={{ mt: 2 }}>
+                                <Typography variant="subtitle1">User Role:</Typography>
+                                <Typography variant="body1">{result.UserRole}</Typography>
+                              </Box>
+                            )}
+                            {result.Enablers && (
+                              <Box sx={{ mt: 2 }}>
+                                <Typography variant="subtitle1">Enablers:</Typography>
+                                <Typography variant="body1">{result.Enablers}</Typography>
+                              </Box>
+                            )}
+                            {result.KeyBenefits && (
+                              <Box sx={{ mt: 2 }}>
+                                <Typography variant="subtitle1">Key Benefits:</Typography>
+                                <Typography variant="body1">{result.KeyBenefits}</Typography>
+                              </Box>
+                            )}
+                          </Paper>
                         </Grid>
                       </Grid>
                     </Box>
