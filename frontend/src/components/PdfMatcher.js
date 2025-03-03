@@ -67,6 +67,13 @@ const TemplateLink = styled(Link)(({ theme }) => ({
   }
 }));
 
+// Helper function to get color based on similarity score
+const getColorByScore = (score) => {
+  if (score >= 0.7) return '#4caf50'; // Green for good match
+  if (score >= 0.4) return '#ff9800'; // Orange for moderate match
+  return '#f44336'; // Red for poor match
+};
+
 /**
  * PdfMatcher Component
  * 
@@ -345,62 +352,161 @@ const PdfMatcher = () => {
                           <ExtractedFieldsDisplay extractedFields={result.extractedFields || {}} />
                         </Grid>
                         
-                        {/* Right side: Best candidate */}
+                        {/* Right side: Best candidate with field-by-field similarity */}
                         <Grid item xs={12} md={6}>
                           <Typography variant="h6" gutterBottom>Best Candidate</Typography>
-                          <Paper elevation={3} sx={{ p: 2, height: '100%' }}>
+                          <Paper elevation={3} sx={{ p: 2, mb: 2 }}>
                             <Typography variant="h6">{result.bestCandidate.UseCaseName}</Typography>
                             <Typography variant="body2" color="text.secondary" paragraph>
                               ID: {result.bestCandidate.UseCaseID}
                             </Typography>
                             <Box sx={{ mt: 2 }}>
-                              <Typography variant="subtitle1">Similarity Score:</Typography>
-                              <Typography variant="body1">{result.bestCandidate.SimilarityScore}</Typography>
+                              <Typography variant="subtitle1">Overall Similarity Score:</Typography>
+                              <Box sx={{ display: 'flex', alignItems: 'center', mt: 1, mb: 2 }}>
+                                <Box sx={{ 
+                                  width: '100%', 
+                                  backgroundColor: '#e0e0e0', 
+                                  borderRadius: 1,
+                                  height: 15,
+                                  mr: 1
+                                }}>
+                                  <Box
+                                    sx={{
+                                      width: `${result.bestCandidate.SimilarityScore * 100}%`,
+                                      height: '100%',
+                                      borderRadius: 1,
+                                      backgroundColor: getColorByScore(result.bestCandidate.SimilarityScore)
+                                    }}
+                                  />
+                                </Box>
+                                <Typography variant="body2" sx={{ minWidth: 50 }}>
+                                  {(result.bestCandidate.SimilarityScore * 100).toFixed(0)}%
+                                </Typography>
+                              </Box>
                             </Box>
+                          </Paper>
+
+                          {/* Field-by-field similarity visualization */}
+                          <Paper elevation={3} sx={{ p: 2, mb: 2 }}>
+                            <Typography variant="subtitle1" sx={{ mb: 2 }}>Field Matching Details</Typography>
+                            
+                            {result.bestCandidate.fieldSimilarities && Object.entries(result.bestCandidate.fieldSimilarities).map(([key, field]) => (
+                              <Box key={key} sx={{ mb: 3 }}>
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
+                                  <Typography variant="body2" fontWeight="bold">
+                                    {field.fieldName} ({key})
+                                  </Typography>
+                                  <Typography variant="body2">
+                                    Match: {(field.score * 100).toFixed(0)}% (Weight: {field.weight * 100}%)
+                                  </Typography>
+                                </Box>
+                                
+                                <Box sx={{ 
+                                  width: '100%', 
+                                  backgroundColor: '#e0e0e0', 
+                                  borderRadius: 1,
+                                  height: 10,
+                                  mb: 1 
+                                }}>
+                                  <Box
+                                    sx={{
+                                      width: `${field.score * 100}%`,
+                                      height: '100%',
+                                      borderRadius: 1,
+                                      backgroundColor: getColorByScore(field.score)
+                                    }}
+                                  />
+                                </Box>
+                                
+                                <Grid container spacing={1}>
+                                  <Grid item xs={6}>
+                                    <Typography variant="caption" color="text.secondary">Form Field:</Typography>
+                                    <Typography variant="body2" 
+                                      sx={{ 
+                                        p: 1, 
+                                        backgroundColor: '#f5f5f5', 
+                                        borderRadius: 1,
+                                        height: 60,
+                                        overflow: 'auto'
+                                      }}
+                                    >
+                                      {field.extractedValue || '(empty)'}
+                                    </Typography>
+                                  </Grid>
+                                  <Grid item xs={6}>
+                                    <Typography variant="caption" color="text.secondary">Use Case Field:</Typography>
+                                    <Typography variant="body2" 
+                                      sx={{ 
+                                        p: 1, 
+                                        backgroundColor: '#f5f5f5', 
+                                        borderRadius: 1,
+                                        height: 60,
+                                        overflow: 'auto'
+                                      }}
+                                    >
+                                      {field.matchedValue || '(empty)'}
+                                    </Typography>
+                                  </Grid>
+                                </Grid>
+                              </Box>
+                            ))}
+                          </Paper>
+
+                          {/* Full use case details */}
+                          <Paper elevation={3} sx={{ p: 2 }}>
+                            <Typography variant="subtitle1" sx={{ mb: 2 }}>Complete Use Case Details</Typography>
+                            
                             <Box sx={{ mt: 2 }}>
-                              <Typography variant="subtitle1">Mapped Solution:</Typography>
-                              <Typography variant="body1">{result.bestCandidate.MappedSolution}</Typography>
+                              <Typography variant="subtitle2">Mapped Solution:</Typography>
+                              <Typography variant="body2">{result.bestCandidate.MappedSolution}</Typography>
                             </Box>
+                            
                             {result.bestCandidate.Challenge && (
                               <Box sx={{ mt: 2 }}>
-                                <Typography variant="subtitle1">Challenge:</Typography>
-                                <Typography variant="body1">{result.bestCandidate.Challenge}</Typography>
+                                <Typography variant="subtitle2">Challenge:</Typography>
+                                <Typography variant="body2">{result.bestCandidate.Challenge}</Typography>
                               </Box>
                             )}
+                            
                             {result.bestCandidate.UserRole && (
                               <Box sx={{ mt: 2 }}>
-                                <Typography variant="subtitle1">User Role:</Typography>
-                                <Typography variant="body1">{result.bestCandidate.UserRole}</Typography>
+                                <Typography variant="subtitle2">User Role:</Typography>
+                                <Typography variant="body2">{result.bestCandidate.UserRole}</Typography>
                               </Box>
                             )}
+                            
                             {result.bestCandidate.ValueDrivers && (
                               <Box sx={{ mt: 2 }}>
-                                <Typography variant="subtitle1">Value Drivers:</Typography>
-                                <Typography variant="body1">{result.bestCandidate.ValueDrivers}</Typography>
+                                <Typography variant="subtitle2">Value Drivers:</Typography>
+                                <Typography variant="body2">{result.bestCandidate.ValueDrivers}</Typography>
                               </Box>
                             )}
+                            
                             {result.bestCandidate.Enablers && (
                               <Box sx={{ mt: 2 }}>
-                                <Typography variant="subtitle1">Enablers:</Typography>
-                                <Typography variant="body1">{result.bestCandidate.Enablers}</Typography>
+                                <Typography variant="subtitle2">Enablers:</Typography>
+                                <Typography variant="body2">{result.bestCandidate.Enablers}</Typography>
                               </Box>
                             )}
+                            
                             {result.bestCandidate.BaselineWithoutAI && (
                               <Box sx={{ mt: 2 }}>
-                                <Typography variant="subtitle1">Baseline without AI:</Typography>
-                                <Typography variant="body1">{result.bestCandidate.BaselineWithoutAI}</Typography>
+                                <Typography variant="subtitle2">Baseline without AI:</Typography>
+                                <Typography variant="body2">{result.bestCandidate.BaselineWithoutAI}</Typography>
                               </Box>
                             )}
+                            
                             {result.bestCandidate.NewWorldWithAI && (
                               <Box sx={{ mt: 2 }}>
-                                <Typography variant="subtitle1">New World (with AI):</Typography>
-                                <Typography variant="body1">{result.bestCandidate.NewWorldWithAI}</Typography>
+                                <Typography variant="subtitle2">New World (with AI):</Typography>
+                                <Typography variant="body2">{result.bestCandidate.NewWorldWithAI}</Typography>
                               </Box>
                             )}
+                            
                             {result.bestCandidate.KeyBenefits && (
                               <Box sx={{ mt: 2 }}>
-                                <Typography variant="subtitle1">Key Benefits:</Typography>
-                                <Typography variant="body1">{result.bestCandidate.KeyBenefits}</Typography>
+                                <Typography variant="subtitle2">Key Benefits:</Typography>
+                                <Typography variant="body2">{result.bestCandidate.KeyBenefits}</Typography>
                               </Box>
                             )}
                           </Paper>
@@ -424,62 +530,161 @@ const PdfMatcher = () => {
                           <ExtractedFieldsDisplay extractedFields={result.extractedFields || {}} />
                         </Grid>
                         
-                        {/* Right side: Matched use case */}
+                        {/* Right side: Matched use case with field-by-field similarity */}
                         <Grid item xs={12} md={6}>
                           <Typography variant="h6" gutterBottom>Matched Use Case</Typography>
-                          <Paper elevation={3} sx={{ p: 2, height: '100%' }}>
+                          <Paper elevation={3} sx={{ p: 2, mb: 2 }}>
                             <Typography variant="h6">{result.UseCaseName}</Typography>
                             <Typography variant="body2" color="text.secondary" paragraph>
                               ID: {result.UseCaseID}
                             </Typography>
                             <Box sx={{ mt: 2 }}>
-                              <Typography variant="subtitle1">Similarity Score:</Typography>
-                              <Typography variant="body1">{result.SimilarityScore}</Typography>
+                              <Typography variant="subtitle1">Overall Similarity Score:</Typography>
+                              <Box sx={{ display: 'flex', alignItems: 'center', mt: 1, mb: 2 }}>
+                                <Box sx={{ 
+                                  width: '100%', 
+                                  backgroundColor: '#e0e0e0', 
+                                  borderRadius: 1,
+                                  height: 15,
+                                  mr: 1
+                                }}>
+                                  <Box
+                                    sx={{
+                                      width: `${result.SimilarityScore * 100}%`,
+                                      height: '100%',
+                                      borderRadius: 1,
+                                      backgroundColor: getColorByScore(result.SimilarityScore)
+                                    }}
+                                  />
+                                </Box>
+                                <Typography variant="body2" sx={{ minWidth: 50 }}>
+                                  {(result.SimilarityScore * 100).toFixed(0)}%
+                                </Typography>
+                              </Box>
                             </Box>
+                          </Paper>
+
+                          {/* Field-by-field similarity visualization */}
+                          <Paper elevation={3} sx={{ p: 2, mb: 2 }}>
+                            <Typography variant="subtitle1" sx={{ mb: 2 }}>Field Matching Details</Typography>
+                            
+                            {result.fieldSimilarities && Object.entries(result.fieldSimilarities).map(([key, field]) => (
+                              <Box key={key} sx={{ mb: 3 }}>
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
+                                  <Typography variant="body2" fontWeight="bold">
+                                    {field.fieldName} ({key})
+                                  </Typography>
+                                  <Typography variant="body2">
+                                    Match: {(field.score * 100).toFixed(0)}% (Weight: {field.weight * 100}%)
+                                  </Typography>
+                                </Box>
+                                
+                                <Box sx={{ 
+                                  width: '100%', 
+                                  backgroundColor: '#e0e0e0', 
+                                  borderRadius: 1,
+                                  height: 10,
+                                  mb: 1 
+                                }}>
+                                  <Box
+                                    sx={{
+                                      width: `${field.score * 100}%`,
+                                      height: '100%',
+                                      borderRadius: 1,
+                                      backgroundColor: getColorByScore(field.score)
+                                    }}
+                                  />
+                                </Box>
+                                
+                                <Grid container spacing={1}>
+                                  <Grid item xs={6}>
+                                    <Typography variant="caption" color="text.secondary">Form Field:</Typography>
+                                    <Typography variant="body2" 
+                                      sx={{ 
+                                        p: 1, 
+                                        backgroundColor: '#f5f5f5', 
+                                        borderRadius: 1,
+                                        height: 60,
+                                        overflow: 'auto'
+                                      }}
+                                    >
+                                      {field.extractedValue || '(empty)'}
+                                    </Typography>
+                                  </Grid>
+                                  <Grid item xs={6}>
+                                    <Typography variant="caption" color="text.secondary">Use Case Field:</Typography>
+                                    <Typography variant="body2" 
+                                      sx={{ 
+                                        p: 1, 
+                                        backgroundColor: '#f5f5f5', 
+                                        borderRadius: 1,
+                                        height: 60,
+                                        overflow: 'auto'
+                                      }}
+                                    >
+                                      {field.matchedValue || '(empty)'}
+                                    </Typography>
+                                  </Grid>
+                                </Grid>
+                              </Box>
+                            ))}
+                          </Paper>
+
+                          {/* Full use case details */}
+                          <Paper elevation={3} sx={{ p: 2 }}>
+                            <Typography variant="subtitle1" sx={{ mb: 2 }}>Complete Use Case Details</Typography>
+                            
                             <Box sx={{ mt: 2 }}>
-                              <Typography variant="subtitle1">Mapped Solution:</Typography>
-                              <Typography variant="body1">{result.MappedSolution}</Typography>
+                              <Typography variant="subtitle2">Mapped Solution:</Typography>
+                              <Typography variant="body2">{result.MappedSolution}</Typography>
                             </Box>
+                            
                             {result.Challenge && (
                               <Box sx={{ mt: 2 }}>
-                                <Typography variant="subtitle1">Challenge:</Typography>
-                                <Typography variant="body1">{result.Challenge}</Typography>
+                                <Typography variant="subtitle2">Challenge:</Typography>
+                                <Typography variant="body2">{result.Challenge}</Typography>
                               </Box>
                             )}
+                            
                             {result.UserRole && (
                               <Box sx={{ mt: 2 }}>
-                                <Typography variant="subtitle1">User Role:</Typography>
-                                <Typography variant="body1">{result.UserRole}</Typography>
+                                <Typography variant="subtitle2">User Role:</Typography>
+                                <Typography variant="body2">{result.UserRole}</Typography>
                               </Box>
                             )}
+                            
                             {result.ValueDrivers && (
                               <Box sx={{ mt: 2 }}>
-                                <Typography variant="subtitle1">Value Drivers:</Typography>
-                                <Typography variant="body1">{result.ValueDrivers}</Typography>
+                                <Typography variant="subtitle2">Value Drivers:</Typography>
+                                <Typography variant="body2">{result.ValueDrivers}</Typography>
                               </Box>
                             )}
+                            
                             {result.Enablers && (
                               <Box sx={{ mt: 2 }}>
-                                <Typography variant="subtitle1">Enablers:</Typography>
-                                <Typography variant="body1">{result.Enablers}</Typography>
+                                <Typography variant="subtitle2">Enablers:</Typography>
+                                <Typography variant="body2">{result.Enablers}</Typography>
                               </Box>
                             )}
+                            
                             {result.BaselineWithoutAI && (
                               <Box sx={{ mt: 2 }}>
-                                <Typography variant="subtitle1">Baseline without AI:</Typography>
-                                <Typography variant="body1">{result.BaselineWithoutAI}</Typography>
+                                <Typography variant="subtitle2">Baseline without AI:</Typography>
+                                <Typography variant="body2">{result.BaselineWithoutAI}</Typography>
                               </Box>
                             )}
+                            
                             {result.NewWorldWithAI && (
                               <Box sx={{ mt: 2 }}>
-                                <Typography variant="subtitle1">New World (with AI):</Typography>
-                                <Typography variant="body1">{result.NewWorldWithAI}</Typography>
+                                <Typography variant="subtitle2">New World (with AI):</Typography>
+                                <Typography variant="body2">{result.NewWorldWithAI}</Typography>
                               </Box>
                             )}
+                            
                             {result.KeyBenefits && (
                               <Box sx={{ mt: 2 }}>
-                                <Typography variant="subtitle1">Key Benefits:</Typography>
-                                <Typography variant="body1">{result.KeyBenefits}</Typography>
+                                <Typography variant="subtitle2">Key Benefits:</Typography>
+                                <Typography variant="body2">{result.KeyBenefits}</Typography>
                               </Box>
                             )}
                           </Paper>

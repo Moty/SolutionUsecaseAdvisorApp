@@ -194,11 +194,11 @@ function loadUseCases() {
 function calculateSimilarityScores(extractedFields, useCases) {
     // Field weights (can be adjusted based on importance)
     const weights = {
-        focusArea: 0.3,          // Increased weight for focusArea
+        focusArea: 0.15,          // Increased weight for focusArea
         process: 0.25,
-        affected: 0.2,
+        affected: 0.15,
         improvement: 0.2,
-        howToImprove: 0.05       // Reduced weight for howToImprove
+        howToImprove: 0.25       // Reduced weight for howToImprove
     };
     
     // Calculate similarity scores for each use case
@@ -226,11 +226,65 @@ function calculateSimilarityScores(extractedFields, useCases) {
             weights.howToImprove * howToImproveSim
         );
         
+        // Store field-level similarities for visualization
+        const fieldSimilarities = {
+            focusArea: {
+                score: parseFloat(focusAreaSim.toFixed(2)),
+                weight: weights.focusArea,
+                extractedValue: extractedFields.focusArea,
+                matchedValue: useCaseFocusArea,
+                fieldName: 'Mapped Solution'
+            },
+            process: {
+                score: parseFloat(processSim.toFixed(2)),
+                weight: weights.process,
+                extractedValue: extractedFields.processToImprove,
+                matchedValue: useCaseProcess,
+                fieldName: 'Challenge'
+            },
+            affected: {
+                score: parseFloat(affectedSim.toFixed(2)),
+                weight: weights.affected,
+                extractedValue: extractedFields.affectedRoles,
+                matchedValue: useCaseAffected,
+                fieldName: 'User Role'
+            },
+            improvement: {
+                score: parseFloat(improvementSim.toFixed(2)),
+                weight: weights.improvement,
+                extractedValue: extractedFields.improvementNeed,
+                matchedValue: useCaseImprovement,
+                fieldName: 'Enablers'
+            },
+            howToImprove: {
+                score: parseFloat(howToImproveSim.toFixed(2)),
+                weight: weights.howToImprove,
+                extractedValue: extractedFields.howToImprove,
+                matchedValue: useCaseHowToImprove,
+                fieldName: 'Key Benefits'
+            }
+        };
+        
+        // Return a complete object with all use case fields and similarity details
         return {
+            // Include all original use case fields
+            ...useCase,
+            
+            // Similarity information
+            SimilarityScore: parseFloat(similarityScore.toFixed(2)),
+            fieldSimilarities: fieldSimilarities,
+            
+            // Required fields to maintain backward compatibility
             UseCaseID: useCase['Use Case ID'],
             UseCaseName: useCase['Use Case Name'],
             MappedSolution: useCase['Mapped Solution'],
-            SimilarityScore: parseFloat(similarityScore.toFixed(2))
+            Challenge: useCase['Challenge'],
+            UserRole: useCase['User Role'],
+            Enablers: useCase['Enablers'],
+            KeyBenefits: useCase['Key Benefits'],
+            ValueDrivers: useCase['Value Drivers'],
+            BaselineWithoutAI: useCase['Baseline without AI'],
+            NewWorldWithAI: useCase['New World (with AI)']
         };
     });
     
