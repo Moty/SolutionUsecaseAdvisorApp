@@ -1,9 +1,8 @@
 const express = require('express');
-const fs = require('fs');
 const path = require('path');
-const { Parser } = require('json2csv');
 const multer = require('multer');
 const { matchPdfToUseCase } = require('../pdfMatcher');
+const solutionsService = require('../services/solutionsService');
 
 // Set up multer for file uploads
 const upload = multer({ 
@@ -20,95 +19,27 @@ const upload = multer({
 
 const router = express.Router();
 
-// In-memory storage for user data (in a real app, this would be a database)
-// This is just for demonstration purposes - in production, use a proper database
-let userDataStore = {
-  favorites: {},
-  annotations: {},
-  ratings: {},
-  filterHistory: []
-};
-
-// Helper function to save user data to a JSON file
-const saveUserData = () => {
-  try {
-    const dataPath = path.join(__dirname, '../data/userData.json');
-    fs.writeFileSync(dataPath, JSON.stringify(userDataStore, null, 2), 'utf8');
-  } catch (error) {
-    console.error('Error saving user data:', error);
-  }
-};
-
-// Helper function to load user data from a JSON file
-const loadUserData = () => {
-  try {
-    const dataPath = path.join(__dirname, '../data/userData.json');
-    if (fs.existsSync(dataPath)) {
-      const userData = fs.readFileSync(dataPath, 'utf8');
-      userDataStore = JSON.parse(userData);
-    }
-  } catch (error) {
-    console.error('Error loading user data:', error);
-  }
-};
-
-// Load user data on server start
-loadUserData();
-
-// Helper function to load use cases data
-const loadUseCases = () => {
-  try {
-    const dataPath = path.join(__dirname, '../data/useCases.json');
-    const useCasesData = fs.readFileSync(dataPath, 'utf8');
-    return JSON.parse(useCasesData);
-  } catch (error) {
-    console.error('Error loading use cases data:', error);
-    return [];
-  }
-};
-
-// Helper function to extract SAP module from Use Case ID
-const extractModule = (useCaseId) => {
-  const modulePrefix = useCaseId.split('_')[0];
-  return modulePrefix;
-};
-
 // GET /api/solutions - Get filtered solutions
-router.get('/solutions', (req, res) => {
+router.get('/solutions', async (req, res) => {
   try {
-    const useCases = loadUseCases();
-    
     // Extract query parameters
     const { role, module, keyword } = req.query;
     
-    // Apply filters
-    let filteredUseCases = useCases;
+    // Create filters object
+    const filters = {};
+    if (role) filters.role = role;
+    if (module) filters.module = module;
+    if (keyword) filters.keyword = keyword;
     
-    // Filter by user role
-    if (role) {
-      filteredUseCases = filteredUseCases.filter(useCase => 
-        useCase['User Role'].toLowerCase().includes(role.toLowerCase())
-      );
-    }
+    console.log('Backend received request for solutions with filters:', filters);
     
-    // Filter by SAP module (extracted from Use Case ID)
-    if (module) {
-      filteredUseCases = filteredUseCases.filter(useCase => 
-        extractModule(useCase['Use Case ID']).toLowerCase() === module.toLowerCase()
-      );
-    }
+    // Get solutions from service
+    const solutions = await solutionsService.getSolutions(filters);
     
-    // Filter by keyword (searches across multiple fields)
-    if (keyword) {
-      filteredUseCases = filteredUseCases.filter(useCase => 
-        useCase['Use Case Name'].toLowerCase().includes(keyword.toLowerCase()) ||
-        useCase['Challenge'].toLowerCase().includes(keyword.toLowerCase()) ||
-        useCase['Key Benefits'].toLowerCase().includes(keyword.toLowerCase()) ||
-        useCase['Mapped Solution'].toLowerCase().includes(keyword.toLowerCase())
-      );
-    }
+    console.log(`Backend returning ${solutions ? solutions.length : 0} solutions`);
+    console.log('First solution sample:', solutions && solutions.length > 0 ? solutions[0] : 'No solutions found');
     
-    res.json(filteredUseCases);
+    res.json(solutions);
   } catch (error) {
     console.error('Error processing solutions request:', error);
     res.status(500).json({ message: 'Server error' });
@@ -116,29 +47,10 @@ router.get('/solutions', (req, res) => {
 });
 
 // GET /api/metrics - Get metrics for dashboard
-router.get('/metrics', (req, res) => {
+router.get('/metrics', async (req, res) => {
   try {
-    const useCases = loadUseCases();
-    
-    // Calculate metrics
-    const moduleDistribution = {};
-    const roleDistribution = {};
-    
-    useCases.forEach(useCase => {
-      // Module distribution
-      const module = extractModule(useCase['Use Case ID']);
-      moduleDistribution[module] = (moduleDistribution[module] || 0) + 1;
-      
-      // Role distribution
-      const role = useCase['User Role'];
-      roleDistribution[role] = (roleDistribution[role] || 0) + 1;
-    });
-    
-    res.json({
-      totalUseCases: useCases.length,
-      moduleDistribution,
-      roleDistribution
-    });
+    const metrics = await solutionsService.getMetrics();
+    res.json(metrics);
   } catch (error) {
     console.error('Error processing metrics request:', error);
     res.status(500).json({ message: 'Server error' });
@@ -146,40 +58,19 @@ router.get('/metrics', (req, res) => {
 });
 
 // GET /api/export - Export filtered solutions as CSV
-router.get('/export', (req, res) => {
+router.get('/export', async (req, res) => {
   try {
-    const useCases = loadUseCases();
-    
-    // Apply the same filters as in /api/solutions
+    // Extract query parameters
     const { role, module, keyword } = req.query;
     
-    let filteredUseCases = useCases;
+    // Create filters object
+    const filters = {};
+    if (role) filters.role = role;
+    if (module) filters.module = module;
+    if (keyword) filters.keyword = keyword;
     
-    if (role) {
-      filteredUseCases = filteredUseCases.filter(useCase => 
-        useCase['User Role'].toLowerCase().includes(role.toLowerCase())
-      );
-    }
-    
-    if (module) {
-      filteredUseCases = filteredUseCases.filter(useCase => 
-        extractModule(useCase['Use Case ID']).toLowerCase() === module.toLowerCase()
-      );
-    }
-    
-    if (keyword) {
-      filteredUseCases = filteredUseCases.filter(useCase => 
-        useCase['Use Case Name'].toLowerCase().includes(keyword.toLowerCase()) ||
-        useCase['Challenge'].toLowerCase().includes(keyword.toLowerCase()) ||
-        useCase['Key Benefits'].toLowerCase().includes(keyword.toLowerCase()) ||
-        useCase['Mapped Solution'].toLowerCase().includes(keyword.toLowerCase())
-      );
-    }
-    
-    // Convert to CSV
-    const fields = Object.keys(useCases[0]);
-    const json2csvParser = new Parser({ fields });
-    const csv = json2csvParser.parse(filteredUseCases);
+    // Get CSV from service
+    const csv = await solutionsService.exportToCsv(filters);
     
     // Set headers for CSV download
     res.setHeader('Content-Type', 'text/csv');
@@ -195,11 +86,11 @@ router.get('/export', (req, res) => {
 // FAVORITES ENDPOINTS
 
 // GET /api/favorites - Get all favorites
-router.get('/favorites', (req, res) => {
+router.get('/favorites', async (req, res) => {
   try {
-    // In a real app, you would get favorites for the authenticated user
-    // For now, we'll return all favorites
-    res.json(userDataStore.favorites);
+    const { userId = 'default' } = req.query;
+    const favorites = await solutionsService.getFavorites(userId);
+    res.json(favorites);
   } catch (error) {
     console.error('Error getting favorites:', error);
     res.status(500).json({ message: 'Server error' });
@@ -207,7 +98,7 @@ router.get('/favorites', (req, res) => {
 });
 
 // POST /api/favorites - Add a solution to favorites
-router.post('/favorites', express.json(), (req, res) => {
+router.post('/favorites', express.json(), async (req, res) => {
   try {
     const { useCaseId, userId = 'default' } = req.body;
     
@@ -215,18 +106,8 @@ router.post('/favorites', express.json(), (req, res) => {
       return res.status(400).json({ message: 'Use case ID is required' });
     }
     
-    // Initialize user's favorites if they don't exist
-    if (!userDataStore.favorites[userId]) {
-      userDataStore.favorites[userId] = [];
-    }
-    
-    // Check if the solution is already in favorites
-    if (!userDataStore.favorites[userId].includes(useCaseId)) {
-      userDataStore.favorites[userId].push(useCaseId);
-      saveUserData();
-    }
-    
-    res.json({ success: true, favorites: userDataStore.favorites[userId] });
+    const favorites = await solutionsService.addFavorite(useCaseId, userId);
+    res.json({ success: true, favorites });
   } catch (error) {
     console.error('Error adding favorite:', error);
     res.status(500).json({ message: 'Server error' });
@@ -234,20 +115,13 @@ router.post('/favorites', express.json(), (req, res) => {
 });
 
 // DELETE /api/favorites/:id - Remove a solution from favorites
-router.delete('/favorites/:id', (req, res) => {
+router.delete('/favorites/:id', async (req, res) => {
   try {
     const useCaseId = req.params.id;
     const { userId = 'default' } = req.query;
     
-    if (!userDataStore.favorites[userId]) {
-      return res.status(404).json({ message: 'No favorites found for this user' });
-    }
-    
-    // Remove the solution from favorites
-    userDataStore.favorites[userId] = userDataStore.favorites[userId].filter(id => id !== useCaseId);
-    saveUserData();
-    
-    res.json({ success: true, favorites: userDataStore.favorites[userId] });
+    const favorites = await solutionsService.removeFavorite(useCaseId, userId);
+    res.json({ success: true, favorites });
   } catch (error) {
     console.error('Error removing favorite:', error);
     res.status(500).json({ message: 'Server error' });
@@ -257,12 +131,11 @@ router.delete('/favorites/:id', (req, res) => {
 // ANNOTATIONS ENDPOINTS
 
 // GET /api/annotations - Get all annotations
-router.get('/annotations', (req, res) => {
+router.get('/annotations', async (req, res) => {
   try {
     const { userId = 'default' } = req.query;
-    
-    // Return annotations for the specified user
-    res.json(userDataStore.annotations[userId] || {});
+    const annotations = await solutionsService.getAnnotations(userId);
+    res.json(annotations);
   } catch (error) {
     console.error('Error getting annotations:', error);
     res.status(500).json({ message: 'Server error' });
@@ -270,7 +143,7 @@ router.get('/annotations', (req, res) => {
 });
 
 // POST /api/annotations - Add or update an annotation
-router.post('/annotations', express.json(), (req, res) => {
+router.post('/annotations', express.json(), async (req, res) => {
   try {
     const { useCaseId, text, userId = 'default' } = req.body;
     
@@ -278,16 +151,8 @@ router.post('/annotations', express.json(), (req, res) => {
       return res.status(400).json({ message: 'Use case ID and text are required' });
     }
     
-    // Initialize user's annotations if they don't exist
-    if (!userDataStore.annotations[userId]) {
-      userDataStore.annotations[userId] = {};
-    }
-    
-    // Add or update the annotation
-    userDataStore.annotations[userId][useCaseId] = text;
-    saveUserData();
-    
-    res.json({ success: true, annotations: userDataStore.annotations[userId] });
+    const annotations = await solutionsService.addAnnotation(useCaseId, text, userId);
+    res.json({ success: true, annotations });
   } catch (error) {
     console.error('Error adding annotation:', error);
     res.status(500).json({ message: 'Server error' });
@@ -295,20 +160,13 @@ router.post('/annotations', express.json(), (req, res) => {
 });
 
 // DELETE /api/annotations/:id - Remove an annotation
-router.delete('/annotations/:id', (req, res) => {
+router.delete('/annotations/:id', async (req, res) => {
   try {
     const useCaseId = req.params.id;
     const { userId = 'default' } = req.query;
     
-    if (!userDataStore.annotations[userId] || !userDataStore.annotations[userId][useCaseId]) {
-      return res.status(404).json({ message: 'Annotation not found' });
-    }
-    
-    // Remove the annotation
-    delete userDataStore.annotations[userId][useCaseId];
-    saveUserData();
-    
-    res.json({ success: true, annotations: userDataStore.annotations[userId] });
+    const annotations = await solutionsService.removeAnnotation(useCaseId, userId);
+    res.json({ success: true, annotations });
   } catch (error) {
     console.error('Error removing annotation:', error);
     res.status(500).json({ message: 'Server error' });
@@ -318,12 +176,11 @@ router.delete('/annotations/:id', (req, res) => {
 // RATINGS ENDPOINTS
 
 // GET /api/ratings - Get all ratings
-router.get('/ratings', (req, res) => {
+router.get('/ratings', async (req, res) => {
   try {
     const { userId = 'default' } = req.query;
-    
-    // Return ratings for the specified user
-    res.json(userDataStore.ratings[userId] || {});
+    const ratings = await solutionsService.getRatings(userId);
+    res.json(ratings);
   } catch (error) {
     console.error('Error getting ratings:', error);
     res.status(500).json({ message: 'Server error' });
@@ -331,7 +188,7 @@ router.get('/ratings', (req, res) => {
 });
 
 // POST /api/ratings - Add or update a rating
-router.post('/ratings', express.json(), (req, res) => {
+router.post('/ratings', express.json(), async (req, res) => {
   try {
     const { useCaseId, rating, feedback = '', userId = 'default' } = req.body;
     
@@ -339,16 +196,8 @@ router.post('/ratings', express.json(), (req, res) => {
       return res.status(400).json({ message: 'Use case ID and rating are required' });
     }
     
-    // Initialize user's ratings if they don't exist
-    if (!userDataStore.ratings[userId]) {
-      userDataStore.ratings[userId] = {};
-    }
-    
-    // Add or update the rating
-    userDataStore.ratings[userId][useCaseId] = { rating, feedback, timestamp: new Date().toISOString() };
-    saveUserData();
-    
-    res.json({ success: true, ratings: userDataStore.ratings[userId] });
+    const ratings = await solutionsService.addRating(useCaseId, rating, feedback, userId);
+    res.json({ success: true, ratings });
   } catch (error) {
     console.error('Error adding rating:', error);
     res.status(500).json({ message: 'Server error' });
@@ -356,27 +205,9 @@ router.post('/ratings', express.json(), (req, res) => {
 });
 
 // GET /api/ratings/summary - Get aggregated ratings
-router.get('/ratings/summary', (req, res) => {
+router.get('/ratings/summary', async (req, res) => {
   try {
-    const summary = {};
-    
-    // Calculate average ratings for each use case
-    Object.values(userDataStore.ratings).forEach(userRatings => {
-      Object.entries(userRatings).forEach(([useCaseId, data]) => {
-        if (!summary[useCaseId]) {
-          summary[useCaseId] = { total: 0, count: 0, average: 0, feedback: [] };
-        }
-        
-        summary[useCaseId].total += data.rating;
-        summary[useCaseId].count += 1;
-        summary[useCaseId].average = summary[useCaseId].total / summary[useCaseId].count;
-        
-        if (data.feedback) {
-          summary[useCaseId].feedback.push(data.feedback);
-        }
-      });
-    });
-    
+    const summary = await solutionsService.getRatingsSummary();
     res.json(summary);
   } catch (error) {
     console.error('Error getting ratings summary:', error);
@@ -387,13 +218,11 @@ router.get('/ratings/summary', (req, res) => {
 // FILTER HISTORY ENDPOINTS
 
 // GET /api/filter-history - Get filter history
-router.get('/filter-history', (req, res) => {
+router.get('/filter-history', async (req, res) => {
   try {
     const { userId = 'default' } = req.query;
-    
-    // Return filter history for the specified user
-    const userHistory = userDataStore.filterHistory.filter(item => item.userId === userId);
-    res.json(userHistory);
+    const history = await solutionsService.getFilterHistory(userId);
+    res.json(history);
   } catch (error) {
     console.error('Error getting filter history:', error);
     res.status(500).json({ message: 'Server error' });
@@ -401,7 +230,7 @@ router.get('/filter-history', (req, res) => {
 });
 
 // POST /api/filter-history - Add a filter to history
-router.post('/filter-history', express.json(), (req, res) => {
+router.post('/filter-history', express.json(), async (req, res) => {
   try {
     const { filters, name = '', userId = 'default' } = req.body;
     
@@ -409,29 +238,8 @@ router.post('/filter-history', express.json(), (req, res) => {
       return res.status(400).json({ message: 'Filters are required' });
     }
     
-    // Add the filter to history
-    const historyItem = {
-      id: Date.now().toString(),
-      userId,
-      filters,
-      name,
-      timestamp: new Date().toISOString()
-    };
-    
-    // Limit history to 10 items per user
-    const userHistory = userDataStore.filterHistory.filter(item => item.userId === userId);
-    if (userHistory.length >= 10) {
-      // Remove the oldest item
-      const oldestIndex = userDataStore.filterHistory.findIndex(item => item.userId === userId);
-      if (oldestIndex !== -1) {
-        userDataStore.filterHistory.splice(oldestIndex, 1);
-      }
-    }
-    
-    userDataStore.filterHistory.push(historyItem);
-    saveUserData();
-    
-    res.json({ success: true, history: userDataStore.filterHistory.filter(item => item.userId === userId) });
+    const history = await solutionsService.addFilterHistory(filters, name, userId);
+    res.json({ success: true, history });
   } catch (error) {
     console.error('Error adding filter history:', error);
     res.status(500).json({ message: 'Server error' });
@@ -482,6 +290,7 @@ router.post('/match-pdf', upload.single('pdf'), async (req, res) => {
     console.log('Final API response:', JSON.stringify(match, null, 2));
     
     // Clean up the temporary file
+    const fs = require('fs');
     fs.unlinkSync(pdfPath);
     
     // Return the match result
@@ -490,8 +299,11 @@ router.post('/match-pdf', upload.single('pdf'), async (req, res) => {
     console.error('Error matching PDF:', error);
     
     // Clean up the temporary file if it exists
-    if (req.file && req.file.path && fs.existsSync(req.file.path)) {
-      fs.unlinkSync(req.file.path);
+    if (req.file && req.file.path) {
+      const fs = require('fs');
+      if (fs.existsSync(req.file.path)) {
+        fs.unlinkSync(req.file.path);
+      }
     }
     
     // Return an error response
@@ -505,43 +317,11 @@ router.post('/match-pdf', upload.single('pdf'), async (req, res) => {
 // NEW USE CASES ENDPOINTS
 
 /**
- * Helper function to load new use cases data
- * @returns {Array} - Array of new use case objects
- */
-const loadNewUseCases = () => {
-  try {
-    const dataPath = path.join(__dirname, '../data/newUseCases.json');
-    if (fs.existsSync(dataPath)) {
-      const newUseCasesData = fs.readFileSync(dataPath, 'utf8');
-      return JSON.parse(newUseCasesData);
-    }
-    return [];
-  } catch (error) {
-    console.error('Error loading new use cases data:', error);
-    return [];
-  }
-};
-
-/**
- * Helper function to save new use cases data
- * @param {Array} newUseCases - Array of new use case objects
- */
-const saveNewUseCases = (newUseCases) => {
-  try {
-    const dataPath = path.join(__dirname, '../data/newUseCases.json');
-    fs.writeFileSync(dataPath, JSON.stringify(newUseCases, null, 2), 'utf8');
-  } catch (error) {
-    console.error('Error saving new use cases data:', error);
-    throw new Error('Failed to save new use cases data');
-  }
-};
-
-/**
  * GET /api/new-use-cases - Get all new use cases
  */
-router.get('/new-use-cases', (req, res) => {
+router.get('/new-use-cases', async (req, res) => {
   try {
-    const newUseCases = loadNewUseCases();
+    const newUseCases = await solutionsService.getNewUseCases();
     res.json(newUseCases);
   } catch (error) {
     console.error('Error getting new use cases:', error);
@@ -552,40 +332,9 @@ router.get('/new-use-cases', (req, res) => {
 /**
  * GET /api/export-new-use-cases - Export new use cases as CSV
  */
-router.get('/export-new-use-cases', (req, res) => {
+router.get('/export-new-use-cases', async (req, res) => {
   try {
-    const newUseCases = loadNewUseCases();
-    
-    if (newUseCases.length === 0) {
-      return res.status(404).json({ message: 'No new use cases found' });
-    }
-    
-    // Prepare data for CSV export by flattening the nested structure
-    const flattenedData = newUseCases.map(useCase => ({
-      'ID': useCase.id,
-      'Name': useCase.mappedFields.UseCaseName,
-      'User Role': useCase.mappedFields.UserRole,
-      'Status': useCase.status,
-      'Created Date': new Date(useCase.timestamp).toLocaleDateString(),
-      'Challenge': useCase.mappedFields.Challenge,
-      'Enablers': useCase.mappedFields.Enablers,
-      'Key Benefits': useCase.mappedFields.KeyBenefits,
-      'Mapped Solution': useCase.mappedFields.MappedSolution,
-      'Focus Area': useCase.extractedFields.focusArea,
-      'Process': useCase.extractedFields.process,
-      'Affected Users': useCase.extractedFields.affected,
-      'Improvement Reason': useCase.extractedFields.improvement,
-      'How to Improve': useCase.extractedFields.howToImprove,
-      'PDF Filename': useCase.pdfFileName,
-      'Notes': useCase.notes
-    }));
-    
-    // Define fields for CSV
-    const fields = Object.keys(flattenedData[0] || {});
-    
-    // Convert to CSV
-    const json2csvParser = new Parser({ fields });
-    const csv = json2csvParser.parse(flattenedData);
+    const csv = await solutionsService.exportNewUseCasesToCsv();
     
     // Set headers for CSV download
     res.setHeader('Content-Type', 'text/csv');
@@ -601,78 +350,68 @@ router.get('/export-new-use-cases', (req, res) => {
 /**
  * POST /api/new-use-cases - Save a new use case
  */
-router.post('/new-use-cases', express.json(), (req, res) => {
+router.post('/new-use-cases', express.json(), async (req, res) => {
   try {
-    const { extractedFields, mappedFields, pdfFileName } = req.body;
+    console.log('Received request to save new use case with data:', JSON.stringify({
+      extractedFields: req.body.extractedFields ? 'present' : 'missing',
+      mappedFields: req.body.mappedFields ? 'present' : 'missing',
+      pdfFileName: req.body.pdfFileName,
+      userId: req.body.userId || 'default'
+    }));
+    
+    const { extractedFields, mappedFields, pdfFileName, userId = 'default' } = req.body;
     
     if (!extractedFields || !mappedFields) {
+      console.error('Missing required fields:', { 
+        extractedFields: !!extractedFields, 
+        mappedFields: !!mappedFields 
+      });
       return res.status(400).json({ message: 'Extracted fields and mapped fields are required' });
     }
     
-    // Load existing new use cases
-    const newUseCases = loadNewUseCases();
+    // Log the mapped fields to see what's being sent
+    console.log('Mapped fields received:', JSON.stringify(mappedFields));
     
-    // Generate a new ID
-    const newId = `NEW_${String(newUseCases.length + 1).padStart(3, '0')}`;
-    
-    // Create a new use case
-    const newUseCase = {
-      id: newId,
-      timestamp: new Date().toISOString(),
-      status: 'pending',
+    const newUseCase = await solutionsService.saveNewUseCase(
       extractedFields,
-      mappedFields: {
-        ...mappedFields,
-        UseCaseID: newId
-      },
-      pdfFileName: pdfFileName || 'unknown.pdf',
-      notes: ''
-    };
+      mappedFields,
+      pdfFileName || 'unknown.pdf',
+      userId
+    );
     
-    // Add the new use case
-    newUseCases.push(newUseCase);
-    
-    // Save the updated new use cases
-    saveNewUseCases(newUseCases);
-    
+    console.log('New use case saved successfully with ID:', newUseCase.id);
     res.status(201).json(newUseCase);
   } catch (error) {
     console.error('Error saving new use case:', error);
-    res.status(500).json({ message: 'Server error' });
+    // Provide more detailed error message to help with debugging
+    res.status(500).json({ 
+      message: 'Server error while saving use case', 
+      error: error.message,
+      stack: process.env.NODE_ENV === 'production' ? undefined : error.stack
+    });
   }
 });
 
 /**
  * PUT /api/new-use-cases/:id - Update a new use case
  */
-router.put('/new-use-cases/:id', express.json(), (req, res) => {
+router.put('/new-use-cases/:id', express.json(), async (req, res) => {
   try {
     const { id } = req.params;
     const { extractedFields, mappedFields, status, notes } = req.body;
     
-    // Load existing new use cases
-    const newUseCases = loadNewUseCases();
+    const updatedUseCase = await solutionsService.updateNewUseCase(id, {
+      extractedFields,
+      mappedFields,
+      status,
+      notes
+    });
     
-    // Find the use case to update
-    const index = newUseCases.findIndex(useCase => useCase.id === id);
-    
-    if (index === -1) {
+    if (!updatedUseCase) {
       return res.status(404).json({ message: 'Use case not found' });
     }
     
-    // Update the use case
-    newUseCases[index] = {
-      ...newUseCases[index],
-      extractedFields: extractedFields || newUseCases[index].extractedFields,
-      mappedFields: mappedFields || newUseCases[index].mappedFields,
-      status: status || newUseCases[index].status,
-      notes: notes !== undefined ? notes : newUseCases[index].notes
-    };
-    
-    // Save the updated new use cases
-    saveNewUseCases(newUseCases);
-    
-    res.json(newUseCases[index]);
+    res.json(updatedUseCase);
   } catch (error) {
     console.error('Error updating new use case:', error);
     res.status(500).json({ message: 'Server error' });
@@ -682,25 +421,15 @@ router.put('/new-use-cases/:id', express.json(), (req, res) => {
 /**
  * DELETE /api/new-use-cases/:id - Delete a new use case
  */
-router.delete('/new-use-cases/:id', (req, res) => {
+router.delete('/new-use-cases/:id', async (req, res) => {
   try {
     const { id } = req.params;
     
-    // Load existing new use cases
-    const newUseCases = loadNewUseCases();
+    const deleted = await solutionsService.deleteNewUseCase(id);
     
-    // Find the use case to delete
-    const index = newUseCases.findIndex(useCase => useCase.id === id);
-    
-    if (index === -1) {
+    if (!deleted) {
       return res.status(404).json({ message: 'Use case not found' });
     }
-    
-    // Remove the use case
-    newUseCases.splice(index, 1);
-    
-    // Save the updated new use cases
-    saveNewUseCases(newUseCases);
     
     res.json({ success: true });
   } catch (error) {

@@ -20,11 +20,39 @@ export const fetchSolutions = async (filters = {}) => {
     if (module) params.module = module;
     if (keyword) params.keyword = keyword;
     
-    const response = await axios.get(`${API_URL}/solutions`, { params });
-    return response.data;
+    console.log('Fetching solutions with params:', params);
+    console.log('API URL used:', `${API_URL}/solutions`);
+    
+    try {
+      const response = await axios.get(`${API_URL}/solutions`, { params });
+      console.log('API response data:', response.data);
+      return response.data;
+    } catch (axiosError) {
+      // Log detailed error information
+      console.error('API request failed with status:', axiosError.response?.status);
+      console.error('Error response data:', axiosError.response?.data);
+      console.error('Error config:', axiosError.config);
+      
+      // Re-throw the error to be handled by the caller
+      throw axiosError;
+    }
   } catch (error) {
-    console.error('Error fetching solutions:', error);
-    throw error;
+    console.error('Error in fetchSolutions function:', error);
+    
+    // If solutions can't be loaded, try returning data from sample file
+    try {
+      // This is a fallback mechanism - create a mock array with error information
+      return [{ 
+        'Use Case ID': 'ERROR_01',
+        'Use Case Name': 'Error loading data',
+        'User Role': 'All roles',
+        'Challenge': `Failed to load data: ${error.message}`,
+        'Key Benefits': 'Please check if the backend server is running and MongoDB is connected.'
+      }];
+    } catch (fallbackError) {
+      console.error('Even fallback mechanism failed:', fallbackError);
+      return [];
+    }
   }
 };
 

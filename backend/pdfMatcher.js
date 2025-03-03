@@ -2,14 +2,14 @@
  * PDF to Mapped Use Case Matcher
  * 
  * This module provides functionality to match a PDF use case to existing mapped solutions.
- * It extracts form fields from a PDF file, identifies key fields, and calculates similarity scores
+ * It extracts form fields from a PDF file and calculates similarity scores
  * to find the best matching use case from the existing dataset.
  */
 
 const fs = require('fs');
 const path = require('path');
-const natural = require('natural');
 const { PDFDocument } = require('pdf-lib');
+const natural = require('natural');
 
 /**
  * Main function to match a PDF use case to existing mapped solutions
@@ -18,14 +18,15 @@ const { PDFDocument } = require('pdf-lib');
  * @param {string} originalFileName - Original file name (optional)
  * @returns {Object} - Best matching use case with similarity score and extracted fields
  */
-async function matchPdfToUseCase(pdfPath, similarityThreshold = 0.20, originalFileName = '') {
+async function matchPdfToUseCase(pdfPath, similarityThreshold = 0.15, originalFileName = '') {
     try {
         // Log the file being processed
         const fileName = path.basename(pdfPath);
         console.log(`Processing PDF file: ${fileName}, Original name: ${originalFileName || 'N/A'}`);
         
-        // 1. Extract fields from PDF form
-        const extractedFields = await extractFormFieldsFromPdf(pdfPath);
+        // 1. Extract form fields from PDF
+        const extractedFields = await extractFieldsFromPdf(pdfPath);
+        console.log('Extracted fields from PDF:', extractedFields);
         
         // 2. Load existing use cases
         const useCases = loadUseCases();
@@ -36,7 +37,7 @@ async function matchPdfToUseCase(pdfPath, similarityThreshold = 0.20, originalFi
         // 4. Find the best match
         const bestMatch = findBestMatch(scoredMatches, similarityThreshold);
         
-        // Create the extracted fields object with fallbacks for empty values
+        // Create the extracted fields object with fallbacks for empty values and correct mappings
         const extractedFieldsObject = {
             focusArea: extractedFields.focusArea || '',
             process: extractedFields.processToImprove || '',
@@ -61,6 +62,9 @@ async function matchPdfToUseCase(pdfPath, similarityThreshold = 0.20, originalFi
             };
         }
         
+        // Add the PDF file name to the result
+        result.pdfFileName = originalFileName || fileName;
+        
         // Log the result for debugging
         console.log('Final result with extracted fields:', JSON.stringify(result, null, 2));
         
@@ -76,176 +80,94 @@ async function matchPdfToUseCase(pdfPath, similarityThreshold = 0.20, originalFi
  * @param {string} pdfPath - Path to the PDF file
  * @returns {Object} - Extracted fields
  */
-async function extractFormFieldsFromPdf(pdfPath) {
+async function extractFieldsFromPdf(pdfPath) {
     try {
-        console.log(`Extracting form fields from PDF: ${pdfPath}`);
+        console.log(`Extracting fields from PDF: ${pdfPath}`);
         
-        // Read the PDF file into a buffer
+        // Read the PDF file
         const pdfBytes = fs.readFileSync(pdfPath);
+        console.log(`Read ${pdfBytes.length} bytes from PDF file`);
         
         // Load the PDF document
-        const pdfDoc = await PDFDocument.load(pdfBytes);
+        const pdfDoc = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
+        const pageCount = pdfDoc.getPageCount();
+        console.log(`PDF has ${pageCount} pages`);
         
-        // Get the form (AcroForm) from the document
-        const form = pdfDoc.getForm();
-        
-        // Get all form fields
-        const fields = form.getFields();
-        
-        console.log(`Found ${fields.length} form fields in the PDF`);
-        
-        // Extract data from form fields
-        const extractedData = {};
-        
-        fields.forEach(field => {
-            const type = field.constructor.name;
-            const name = field.getName();
-            let value = '';
-            
-            try {
-                if (type === 'PDFTextField') {
-                    value = field.getText() || '';
-                } else if (type === 'PDFCheckBox') {
-                    value = field.isChecked() ? 'Yes' : 'No';
-                } else if (type === 'PDFDropdown') {
-                    value = field.getSelected() || '';
-                } else if (type === 'PDFRadioGroup') {
-                    value = field.getSelected() || '';
-                } else {
-                    // For other field types, try to use getText if available
-                    value = field.getText ? field.getText() : '';
-                }
-            } catch (err) {
-                console.warn(`Error extracting value from field ${name}:`, err.message);
-                value = '';
-            }
-            
-            extractedData[name] = value;
-        });
-        
-        console.log('Extracted form fields:', extractedData);
-        
-        // Map form fields to our expected structure
-        return mapFormFieldsToExpectedStructure(extractedData);
-    } catch (error) {
-        console.error('Error extracting form fields from PDF:', error);
-        // Return empty fields if extraction fails
-        return {
+        // Map field names to our expected structure
+        const extractedFields = {
             focusArea: '',
             processToImprove: '',
             affectedRoles: '',
             improvementNeed: '',
             howToImprove: ''
         };
-    }
-}
-
-/**
- * Map extracted form fields to the expected structure for similarity calculation
- * @param {Object} formFields - Raw form fields extracted from the PDF
- * @returns {Object} - Mapped fields in the expected structure
- */
-function mapFormFieldsToExpectedStructure(formFields) {
-    // Initialize with empty values
-    const mappedFields = {
-        focusArea: '',
-        processToImprove: '',
-        affectedRoles: '',
-        improvementNeed: '',
-        howToImprove: ''
-    };
-    
-    // Direct mapping based on the field names found in the PDF
-    if (formFields["Focus Area"]) {
-        mappedFields.focusArea = formFields["Focus Area"];
-    }
-    
-    if (formFields["Process / Activity to Improve"]) {
-        mappedFields.processToImprove = formFields["Process / Activity to Improve"].replace(/\r/g, '');
-    }
-    
-    if (formFields["Affected Roles and Departments"]) {
-        mappedFields.affectedRoles = formFields["Affected Roles and Departments"];
-    }
-    
-    if (formFields["Challenges with Activity"]) {
-        mappedFields.improvementNeed = formFields["Challenges with Activity"];
-    }
-    
-    if (formFields["Ideas for improvement"]) {
-        mappedFields.howToImprove = formFields["Ideas for improvement"].replace(/\r/g, '');
-    }
-    
-    // Fallback to generic field mapping if the specific fields aren't found
-    if (!hasValidFields(mappedFields)) {
-        // Common field names in PDF forms
-        const focusAreaFieldNames = ['FocusArea', 'Focus_Area', 'focus_area', 'focusarea', 'YourFocusArea', 'Focus Area'];
-        const processFieldNames = ['Process', 'ProcessToImprove', 'process_activity', 'WhatProcess', 'ProcessActivity', 'Process / Activity'];
-        const affectedFieldNames = ['Affected', 'WhoAffected', 'affected_roles', 'MainlyAffected', 'AffectedRoles', 'Affected Roles'];
-        const improvementFieldNames = ['ImprovementReason', 'WhyImprovement', 'improvement_reason', 'WhyNeeded', 'Improvement', 'Challenges'];
-        const howToImproveFieldNames = ['HowToImprove', 'how_improve', 'HowCouldBeImproved', 'ImprovementIdea', 'HowImprove', 'Ideas'];
         
-        // Try to find matching fields for each expected field
-        for (const [fieldName, fieldValue] of Object.entries(formFields)) {
-            const lowerFieldName = fieldName.toLowerCase();
+        // Method 1: Try to get interactive form fields
+        try {
+            const form = pdfDoc.getForm();
+            const fields = form.getFields();
+            console.log(`Found ${fields.length} form fields in PDF`);
             
-            // Check for focus area field
-            if (focusAreaFieldNames.some(name => lowerFieldName.includes(name.toLowerCase()))) {
-                mappedFields.focusArea = fieldValue;
+            // Process each field
+            for (const field of fields) {
+                const fieldName = field.getName();
+                let fieldValue = '';
+                
+                // Get field value based on type
+                if (field.constructor.name === 'PDFTextField') {
+                    fieldValue = field.getText() || '';
+                } else if (field.constructor.name === 'PDFCheckBox') {
+                    fieldValue = field.isChecked() ? 'Yes' : 'No';
+                } else if (field.constructor.name === 'PDFRadioGroup') {
+                    fieldValue = field.getSelected() || '';
+                } else if (field.constructor.name === 'PDFDropdown') {
+                    fieldValue = field.getSelected() || '';
+                } else if (field.constructor.name === 'PDFOptionList') {
+                    fieldValue = field.getSelected().join(', ') || '';
+                }
+                
+                console.log(`Field ${fieldName}: ${fieldValue}`);
+                
+                // Map field to our structure based on specific field name patterns
+                if (/focus\s*area/i.test(fieldName)) {
+                    extractedFields.focusArea = fieldValue;
+                } else if (/process\s*\/?\s*activity.*improve/i.test(fieldName)) {
+                    extractedFields.processToImprove = fieldValue;
+                } else if (/affected\s*roles|departments/i.test(fieldName)) {
+                    extractedFields.affectedRoles = fieldValue;
+                } else if (/challenges|need.*improvement/i.test(fieldName)) {
+                    extractedFields.improvementNeed = fieldValue;
+                } else if (/ideas\s*for\s*improvement/i.test(fieldName)) {
+                    extractedFields.howToImprove = fieldValue;
+                }
             }
-            // Check for process field
-            else if (processFieldNames.some(name => lowerFieldName.includes(name.toLowerCase()))) {
-                mappedFields.processToImprove = fieldValue;
-            }
-            // Check for affected roles field
-            else if (affectedFieldNames.some(name => lowerFieldName.includes(name.toLowerCase()))) {
-                mappedFields.affectedRoles = fieldValue;
-            }
-            // Check for improvement reason field
-            else if (improvementFieldNames.some(name => lowerFieldName.includes(name.toLowerCase()))) {
-                mappedFields.improvementNeed = fieldValue;
-            }
-            // Check for how to improve field
-            else if (howToImproveFieldNames.some(name => lowerFieldName.includes(name.toLowerCase()))) {
-                mappedFields.howToImprove = fieldValue;
-            }
+        } catch (formError) {
+            console.warn('Error extracting interactive form fields:', formError.message);
         }
         
-        // If we still couldn't find any fields, try to use a fallback approach
-        if (!hasValidFields(mappedFields) && Object.keys(formFields).length > 0) {
-            // If we have at least 5 fields, try to map them in order
-            const fieldValues = Object.values(formFields);
-            if (fieldValues.length >= 5) {
-                mappedFields.focusArea = fieldValues[0] || '';
-                mappedFields.processToImprove = fieldValues[1] || '';
-                mappedFields.affectedRoles = fieldValues[2] || '';
-                mappedFields.improvementNeed = fieldValues[3] || '';
-                mappedFields.howToImprove = fieldValues[4] || '';
-            }
+        // Method 2: If we couldn't extract properly, use generic fallback
+        if (Object.values(extractedFields).every(value => !value)) {
+            console.log('No form fields found or extracted. Using fallback values.');
+            
+            // Generic fallback for forms without interactive fields
+            extractedFields.focusArea = 'Unknown';
+            extractedFields.processToImprove = 'PDF Form without interactive fields';
+            extractedFields.affectedRoles = 'Form User';
+            extractedFields.improvementNeed = 'Need to identify form fields automatically';
+            extractedFields.howToImprove = 'Convert to interactive PDF form';
         }
+        
+        return extractedFields;
+    } catch (error) {
+        console.error('Error extracting fields from PDF:', error);
+        return {
+            focusArea: 'Error',
+            processToImprove: 'Error processing PDF form',
+            affectedRoles: 'Unknown',
+            improvementNeed: `Error: ${error.message}`,
+            howToImprove: 'Try with a valid PDF form'
+        };
     }
-    
-    // Clean up any carriage returns or other unwanted characters
-    Object.keys(mappedFields).forEach(key => {
-        if (typeof mappedFields[key] === 'string') {
-            mappedFields[key] = mappedFields[key].replace(/\r/g, '').trim();
-        }
-    });
-    
-    console.log('Mapped fields:', mappedFields);
-    return mappedFields;
-}
-
-/**
- * Check if the fields object contains valid field values
- * @param {Object} fields - Extracted fields
- * @returns {boolean} - True if fields are valid
- */
-function hasValidFields(fields) {
-    // Check if we have at least some valid fields
-    return fields && 
-           Object.keys(fields).length > 0 && 
-           (fields.focusArea || fields.processToImprove || fields.affectedRoles || fields.improvementNeed || fields.howToImprove);
 }
 
 /**
@@ -272,22 +194,22 @@ function loadUseCases() {
 function calculateSimilarityScores(extractedFields, useCases) {
     // Field weights (can be adjusted based on importance)
     const weights = {
-        focusArea: 0.35,          // Further increased weight for focusArea
-        process: 0.30,            // Increased weight for process
-        affected: 0.25,           // Maintained weight for affected
-        improvement: 0.05,        // Reduced weight for improvement
-        howToImprove: 0.05        // Maintained reduced weight for howToImprove
+        focusArea: 0.3,          // Increased weight for focusArea
+        process: 0.25,
+        affected: 0.2,
+        improvement: 0.2,
+        howToImprove: 0.05       // Reduced weight for howToImprove
     };
     
     // Calculate similarity scores for each use case
     const scoredMatches = useCases.map(useCase => {
         // Extract relevant fields from the use case
-        const useCaseFocusArea = useCase['Mapped Solution']; 
-        const useCaseProcess = useCase['Challenge'];       
-        const useCaseAffected = useCase['User Role'];      
-        const useCaseImprovement = useCase['Enablers'];    
-        const useCaseHowToImprove = useCase['Key Benefits']; 
-    
+        const useCaseFocusArea = useCase['Mapped Solution']; // focusArea maps to Mapped Solution
+        const useCaseProcess = useCase['Challenge'];       // process maps to Challenge
+        const useCaseAffected = useCase['User Role'];      // affected maps to User Role
+        const useCaseImprovement = useCase['Enablers'];    // improvement maps to Enablers
+        const useCaseHowToImprove = useCase['Key Benefits']; // howToImprove maps to Key Benefits
+
         // Calculate field-level similarities
         const focusAreaSim = calculateStringSimilarity(extractedFields.focusArea, useCaseFocusArea);
         const processSim = calculateStringSimilarity(extractedFields.processToImprove, useCaseProcess);
@@ -304,20 +226,11 @@ function calculateSimilarityScores(extractedFields, useCases) {
             weights.howToImprove * howToImproveSim
         );
         
-        // Store the full use case data along with the similarity score
         return {
             UseCaseID: useCase['Use Case ID'],
             UseCaseName: useCase['Use Case Name'],
             MappedSolution: useCase['Mapped Solution'],
-            Challenge: useCase['Challenge'],
-            UserRole: useCase['User Role'],
-            ValueDrivers: useCase['Value Drivers'],
-            Enablers: useCase['Enablers'],
-            BaselineWithoutAI: useCase['Baseline without AI'],
-            NewWorldWithAI: useCase['New World (with AI)'],
-            KeyBenefits: useCase['Key Benefits'],
-            SimilarityScore: parseFloat(similarityScore.toFixed(2)),
-            originalUseCase: useCase // Store the original use case for reference
+            SimilarityScore: parseFloat(similarityScore.toFixed(2))
         };
     });
     
@@ -398,7 +311,9 @@ function calculateCosineSimilarity(tfidf, doc1Index, doc2Index) {
  */
 function findBestMatch(scoredMatches, threshold) {
     if (scoredMatches.length === 0) {
-        return null;
+        return {
+            message: "No use cases available for matching. Please check your database."
+        };
     }
     
     const bestMatch = scoredMatches[0];
