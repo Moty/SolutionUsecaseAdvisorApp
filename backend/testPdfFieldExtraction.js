@@ -37,6 +37,12 @@ async function extractFieldsFromPdf(pdfPath) {
             const fields = form.getFields();
             console.log(`Found ${fields.length} form fields in PDF`);
             
+            // List all field names for debugging
+            console.log('Field names:');
+            fields.forEach(field => {
+                console.log(` - ${field.getName()} (${field.constructor.name})`);
+            });
+            
             // Process each field
             for (const field of fields) {
                 const fieldName = field.getName();
@@ -62,11 +68,25 @@ async function extractFieldsFromPdf(pdfPath) {
                     extractedFields.focusArea = fieldValue;
                 } else if (/process\s*\/?\s*activity.*improve/i.test(fieldName)) {
                     extractedFields.processToImprove = fieldValue;
-                } else if (/affected\s*roles|departments/i.test(fieldName)) {
+                } else if (/affected\s*roles|departments|who.*affected/i.test(fieldName)) {
                     extractedFields.affectedRoles = fieldValue;
-                } else if (/challenges|need.*improvement/i.test(fieldName)) {
+                } else if (/challenges|need.*improvement|why.*improve/i.test(fieldName)) {
                     extractedFields.improvementNeed = fieldValue;
-                } else if (/ideas\s*for\s*improvement/i.test(fieldName)) {
+                } else if (/ideas\s*for\s*improvement|how.*improve/i.test(fieldName)) {
+                    extractedFields.howToImprove = fieldValue;
+                }
+                
+                // Additional pattern matching for non-standard field names
+                const lowerFieldName = fieldName.toLowerCase();
+                if (lowerFieldName.includes('focus') && !extractedFields.focusArea) {
+                    extractedFields.focusArea = fieldValue;
+                } else if ((lowerFieldName.includes('process') || lowerFieldName.includes('what')) && !extractedFields.processToImprove) {
+                    extractedFields.processToImprove = fieldValue;
+                } else if ((lowerFieldName.includes('affect') || lowerFieldName.includes('who')) && !extractedFields.affectedRoles) {
+                    extractedFields.affectedRoles = fieldValue;
+                } else if ((lowerFieldName.includes('why') || lowerFieldName.includes('need')) && !extractedFields.improvementNeed) {
+                    extractedFields.improvementNeed = fieldValue;
+                } else if ((lowerFieldName.includes('how') || lowerFieldName.includes('idea')) && !extractedFields.howToImprove) {
                     extractedFields.howToImprove = fieldValue;
                 }
             }
@@ -92,8 +112,8 @@ async function testPdfFieldExtraction() {
     console.log('======= Testing PDF Field Extraction =======');
     
     try {
-        // Define the path to the sample PDF
-        const samplePdfPath = path.join(__dirname, './data/SampleData/SAP_Area_Of_Improvement_Template_Sample.pdf');
+        // Define the path to the sample PDF - Using Sample_2 PDF
+        const samplePdfPath = path.join(__dirname, './data/SampleData/SAP_Area_Of_Improvement_Template_Sample_2.pdf');
         
         // Check if the file exists
         if (!fs.existsSync(samplePdfPath)) {
@@ -105,13 +125,13 @@ async function testPdfFieldExtraction() {
         const stats = fs.statSync(samplePdfPath);
         console.log(`Sample PDF file size: ${stats.size} bytes`);
         
-        // Define expected field values
+        // Define expected field values for SAP_Area_Of_Improvement_Template_Sample_2.pdf
         const expectedValues = {
-            focusArea: 'Test Value 1',
-            processToImprove: 'Test Value 2',
-            affectedRoles: 'Test Value 3',
-            improvementNeed: 'Test Value 4',
-            howToImprove: 'Test Value 5'
+            focusArea: 'SAP Field Service Management, Equipment Insights',
+            processToImprove: 'Field service equipment maintenance and technician dispatching',
+            affectedRoles: 'Field service managers, technicians, equipment operators',
+            improvementNeed: 'Need quick access to equipment history and performance data to select the right technician',
+            howToImprove: 'Faster decision-making; improved service quality; lower downtime'
         };
         
         console.log(`Testing extraction from: ${samplePdfPath}`);
@@ -146,8 +166,12 @@ async function testPdfFieldExtraction() {
             console.log('ALL FIELDS EXTRACTED CORRECTLY ✓');
         } else {
             console.log('SOME FIELDS DID NOT MATCH EXPECTED VALUES ✗');
-            console.log('This is expected without the special case handling that was removed.');
-            console.log('To make this test pass, you would need to ensure your PDF form has interactive form fields with proper names.');
+            console.log('Make sure the PDF form has the following field names:');
+            console.log(' - Field for "Focus Area"');
+            console.log(' - Field for "Process/Activity to improve"');
+            console.log(' - Field for "Affected Roles/Departments"');
+            console.log(' - Field for "Improvement Need/Challenges"');
+            console.log(' - Field for "How to Improve/Ideas for improvement"');
         }
     } catch (error) {
         console.error('Test failed with error:', error);

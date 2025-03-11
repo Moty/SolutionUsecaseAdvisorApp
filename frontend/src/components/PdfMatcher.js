@@ -15,7 +15,13 @@ import {
   AlertTitle,
   Tabs,
   Tab,
-  Link
+  Link,
+  Switch,
+  FormControlLabel,
+  Collapse,
+  IconButton,
+  Tooltip,
+  Stack
 } from '@mui/material';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import DescriptionIcon from '@mui/icons-material/Description';
@@ -23,6 +29,10 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ErrorIcon from '@mui/icons-material/Error';
 import SaveIcon from '@mui/icons-material/Save';
 import DownloadIcon from '@mui/icons-material/Download';
+import TuneIcon from '@mui/icons-material/Tune';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
+import SmartToyIcon from '@mui/icons-material/SmartToy';
 import { styled } from '@mui/material/styles';
 import axios from 'axios';
 
@@ -31,6 +41,8 @@ import PdfViewer from './PdfViewer';
 import ExtractedFieldsDisplay from './ExtractedFieldsDisplay';
 import SaveNewUseCaseForm from './SaveNewUseCaseForm';
 import NewUseCasesList from './NewUseCasesList';
+import SimilarityWeightSettings from './SimilarityWeightSettings';
+import { SimilarityVisualization, BasicSimilarityBar } from './SimilarityVisualization';
 
 // Styled components
 const UploadBox = styled(Paper)(({ theme }) => ({
@@ -79,6 +91,12 @@ const getColorByScore = (score) => {
  * 
  * This component allows users to upload a PDF file and find the best matching
  * SAP use case based on the content of the PDF.
+ * 
+ * Enhanced with:
+ * - AI-based matching capabilities
+ * - Customizable similarity weights
+ * - Advanced visualizations for similarity scores
+ * - Alternative candidates when no match is found
  */
 const PdfMatcher = () => {
   // State variables
@@ -90,6 +108,13 @@ const PdfMatcher = () => {
   const [tabValue, setTabValue] = useState(0);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [pdfDataUrl, setPdfDataUrl] = useState(null);
+  
+  // New state variables for enhanced features
+  const [useAI, setUseAI] = useState(true);
+  const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
+  const [weightsDialogOpen, setWeightsDialogOpen] = useState(false);
+  const [customWeights, setCustomWeights] = useState(null);
+  const [showAlternatives, setShowAlternatives] = useState(false);
 
   // Handle file selection
   const handleFileSelect = (event) => {
@@ -126,6 +151,27 @@ const PdfMatcher = () => {
     setThreshold(newValue);
   };
 
+  // Handle AI toggle change
+  const handleAIChange = (event) => {
+    setUseAI(event.target.checked);
+  };
+
+  // Handle weights dialog open
+  const handleOpenWeightsDialog = () => {
+    setWeightsDialogOpen(true);
+  };
+
+  // Handle weights dialog close
+  const handleCloseWeightsDialog = () => {
+    setWeightsDialogOpen(false);
+  };
+
+  // Handle weights save
+  const handleSaveWeights = (weights) => {
+    setCustomWeights(weights);
+    setWeightsDialogOpen(false);
+  };
+
   // Handle file upload and matching
   const handleUpload = async () => {
     if (!file) {
@@ -136,6 +182,7 @@ const PdfMatcher = () => {
     setLoading(true);
     setError(null);
     setResult(null);
+    setShowAlternatives(false);
 
     try {
       // Create a data URL for the PDF viewer
@@ -149,6 +196,12 @@ const PdfMatcher = () => {
       const formData = new FormData();
       formData.append('pdf', file);
       formData.append('threshold', threshold);
+      formData.append('useAI', useAI);
+      
+      // Add custom weights if available
+      if (customWeights) {
+        formData.append('customWeights', JSON.stringify(customWeights));
+      }
 
       // Send request to API
       const response = await axios.post('/api/match-pdf', formData, {
@@ -177,18 +230,6 @@ const PdfMatcher = () => {
 
       // Set result
       console.log('API Response:', response.data);
-      console.log('Extracted Fields:', response.data.extractedFields);
-      console.log('Original Filename:', response.data.pdfFileName);
-      console.log('Has extractedFields property:', response.data.hasOwnProperty('extractedFields'));
-      console.log('extractedFields type:', typeof response.data.extractedFields);
-      
-      if (response.data.extractedFields) {
-        console.log('extractedFields keys:', Object.keys(response.data.extractedFields));
-        console.log('extractedFields values:', Object.values(response.data.extractedFields));
-      } else {
-        console.log('extractedFields is null or undefined');
-      }
-      
       setResult(response.data);
     } catch (error) {
       console.error('Error matching PDF:', error);
@@ -196,6 +237,11 @@ const PdfMatcher = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Toggle showing alternative candidates
+  const handleToggleAlternatives = () => {
+    setShowAlternatives(!showAlternatives);
   };
 
   // Handle tab change
@@ -288,31 +334,101 @@ const PdfMatcher = () => {
               </Alert>
             )}
 
-            {/* Threshold Slider */}
-            <Box sx={{ mt: 4 }}>
-              <Typography id="threshold-slider" gutterBottom>
-                Similarity Threshold: {threshold}
-              </Typography>
-              <Slider
-                value={threshold}
-                onChange={handleThresholdChange}
-                aria-labelledby="threshold-slider"
-                step={0.05}
-                marks
-                min={0}
-                max={1}
-                valueLabelDisplay="auto"
-              />
-              <Typography variant="body2" color="text.secondary">
-                Lower values will return matches with less similarity. Higher values require closer matches.
-              </Typography>
+            {/* Matching Options */}
+            <Box sx={{ mt: 3 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Typography variant="h6">Matching Options</Typography>
+                <Button 
+                  startIcon={<ExpandMoreIcon 
+                    sx={{ 
+                      transform: showAdvancedOptions ? 'rotate(180deg)' : 'rotate(0deg)',
+                      transition: '0.3s'
+                    }} 
+                  />}
+                  onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
+                  size="small"
+                >
+                  {showAdvancedOptions ? 'Hide Advanced Options' : 'Show Advanced Options'}
+                </Button>
+              </Box>
+              
+              {/* Basic Options */}
+              <Box sx={{ mt: 2 }}>
+                <FormControlLabel
+                  control={
+                    <Switch 
+                      checked={useAI}
+                      onChange={handleAIChange}
+                      color="primary"
+                    />
+                  }
+                  label={
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                      <SmartToyIcon sx={{ mr: 1, fontSize: 18 }} />
+                      <Typography>Use AI-enhanced matching</Typography>
+                    </Box>
+                  }
+                />
+                <Tooltip title="AI-enhanced matching uses advanced NLP techniques to better understand the semantic meaning of your document content">
+                  <Box component="span" sx={{ ml: 1, color: 'primary.main', fontSize: '0.85rem' }}>
+                    (Recommended)
+                  </Box>
+                </Tooltip>
+              </Box>
+
+              {/* Threshold Slider */}
+              <Box sx={{ mt: 2 }}>
+                <Typography id="threshold-slider" gutterBottom>
+                  Similarity Threshold: {threshold}
+                </Typography>
+                <Slider
+                  value={threshold}
+                  onChange={handleThresholdChange}
+                  aria-labelledby="threshold-slider"
+                  step={0.05}
+                  marks
+                  min={0}
+                  max={1}
+                  valueLabelDisplay="auto"
+                  valueLabelFormat={(value) => `${(value * 100).toFixed(0)}%`}
+                />
+                <Typography variant="body2" color="text.secondary">
+                  Lower values will return matches with less similarity. Higher values require closer matches.
+                </Typography>
+              </Box>
+
+              {/* Advanced Options */}
+              <Collapse in={showAdvancedOptions}>
+                <Box sx={{ mt: 3, p: 2, bgcolor: 'background.default', borderRadius: 1 }}>
+                  <Typography variant="subtitle1" gutterBottom>Advanced Configuration</Typography>
+                  
+                  <Button
+                    variant="outlined"
+                    startIcon={<TuneIcon />}
+                    onClick={handleOpenWeightsDialog}
+                    sx={{ mt: 1 }}
+                    size="small"
+                  >
+                    Customize Similarity Weights
+                  </Button>
+                  
+                  {customWeights && (
+                    <Alert severity="info" sx={{ mt: 2 }}>
+                      <AlertTitle>Custom Weights Applied</AlertTitle>
+                      You are using custom weights for field matching. 
+                      Click the button above to modify them.
+                    </Alert>
+                  )}
+                </Box>
+              </Collapse>
             </Box>
 
             {/* Upload Button */}
-            <Box sx={{ mt: 2, textAlign: 'center' }}>
+            <Box sx={{ mt: 3, textAlign: 'center' }}>
               <Button
                 variant="contained"
                 color="primary"
+                size="large"
                 onClick={handleUpload}
                 disabled={!file || loading}
                 startIcon={loading ? <CircularProgress size={20} color="inherit" /> : null}
@@ -342,6 +458,21 @@ const PdfMatcher = () => {
                           Save as New Use Case
                         </Button>
                       </Box>
+                      
+                      {/* Alternative candidates button */}
+                      {result.alternativeCandidates && result.alternativeCandidates.length > 0 && (
+                        <Box sx={{ mt: 1, mb: 2, display: 'flex', justifyContent: 'flex-end' }}>
+                          <Button
+                            variant="outlined"
+                            startIcon={<CompareArrowsIcon />}
+                            onClick={handleToggleAlternatives}
+                            size="small"
+                          >
+                            {showAlternatives ? 'Hide' : 'Show'} Alternative Candidates ({result.alternativeCandidates.length})
+                          </Button>
+                        </Box>
+                      )}
+                      
                       <Divider sx={{ my: 2 }} />
                       
                       {/* Side-by-side comparison for no match */}
@@ -352,109 +483,26 @@ const PdfMatcher = () => {
                           <ExtractedFieldsDisplay extractedFields={result.extractedFields || {}} />
                         </Grid>
                         
-                        {/* Right side: Best candidate with field-by-field similarity */}
+                        {/* Right side: Best candidate with improved visualization */}
                         <Grid item xs={12} md={6}>
                           <Typography variant="h6" gutterBottom>Best Candidate</Typography>
-                          <Paper elevation={3} sx={{ p: 2, mb: 2 }}>
-                            <Typography variant="h6">{result.bestCandidate.UseCaseName}</Typography>
-                            <Typography variant="body2" color="text.secondary" paragraph>
-                              ID: {result.bestCandidate.UseCaseID}
-                            </Typography>
-                            <Box sx={{ mt: 2 }}>
-                              <Typography variant="subtitle1">Overall Similarity Score:</Typography>
-                              <Box sx={{ display: 'flex', alignItems: 'center', mt: 1, mb: 2 }}>
-                                <Box sx={{ 
-                                  width: '100%', 
-                                  backgroundColor: '#e0e0e0', 
-                                  borderRadius: 1,
-                                  height: 15,
-                                  mr: 1
-                                }}>
-                                  <Box
-                                    sx={{
-                                      width: `${result.bestCandidate.SimilarityScore * 100}%`,
-                                      height: '100%',
-                                      borderRadius: 1,
-                                      backgroundColor: getColorByScore(result.bestCandidate.SimilarityScore)
-                                    }}
-                                  />
-                                </Box>
-                                <Typography variant="body2" sx={{ minWidth: 50 }}>
-                                  {(result.bestCandidate.SimilarityScore * 100).toFixed(0)}%
-                                </Typography>
-                              </Box>
-                            </Box>
-                          </Paper>
-
-                          {/* Field-by-field similarity visualization */}
-                          <Paper elevation={3} sx={{ p: 2, mb: 2 }}>
-                            <Typography variant="subtitle1" sx={{ mb: 2 }}>Field Matching Details</Typography>
-                            
-                            {result.bestCandidate.fieldSimilarities && Object.entries(result.bestCandidate.fieldSimilarities).map(([key, field]) => (
-                              <Box key={key} sx={{ mb: 3 }}>
-                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
-                                  <Typography variant="body2" fontWeight="bold">
-                                    {field.fieldName} ({key})
-                                  </Typography>
-                                  <Typography variant="body2">
-                                    Match: {(field.score * 100).toFixed(0)}% (Weight: {field.weight * 100}%)
-                                  </Typography>
-                                </Box>
-                                
-                                <Box sx={{ 
-                                  width: '100%', 
-                                  backgroundColor: '#e0e0e0', 
-                                  borderRadius: 1,
-                                  height: 10,
-                                  mb: 1 
-                                }}>
-                                  <Box
-                                    sx={{
-                                      width: `${field.score * 100}%`,
-                                      height: '100%',
-                                      borderRadius: 1,
-                                      backgroundColor: getColorByScore(field.score)
-                                    }}
-                                  />
-                                </Box>
-                                
-                                <Grid container spacing={1}>
-                                  <Grid item xs={6}>
-                                    <Typography variant="caption" color="text.secondary">Form Field:</Typography>
-                                    <Typography variant="body2" 
-                                      sx={{ 
-                                        p: 1, 
-                                        backgroundColor: '#f5f5f5', 
-                                        borderRadius: 1,
-                                        height: 60,
-                                        overflow: 'auto'
-                                      }}
-                                    >
-                                      {field.extractedValue || '(empty)'}
-                                    </Typography>
-                                  </Grid>
-                                  <Grid item xs={6}>
-                                    <Typography variant="caption" color="text.secondary">Use Case Field:</Typography>
-                                    <Typography variant="body2" 
-                                      sx={{ 
-                                        p: 1, 
-                                        backgroundColor: '#f5f5f5', 
-                                        borderRadius: 1,
-                                        height: 60,
-                                        overflow: 'auto'
-                                      }}
-                                    >
-                                      {field.matchedValue || '(empty)'}
-                                    </Typography>
-                                  </Grid>
-                                </Grid>
-                              </Box>
-                            ))}
-                          </Paper>
-
-                          {/* Full use case details */}
+                          
+                          <SimilarityVisualization
+                            similarityScore={result.bestCandidate.SimilarityScore}
+                            fieldSimilarities={result.bestCandidate.fieldSimilarities}
+                            title={result.bestCandidate.UseCaseName || result.bestCandidate['Use Case Name']}
+                            aiEnhanced={result.aiEnhanced}
+                            visualizationType="all"
+                            matchingMatrix={result.bestCandidate.matchingMatrix}
+                          />
+                          
                           <Paper elevation={3} sx={{ p: 2 }}>
                             <Typography variant="subtitle1" sx={{ mb: 2 }}>Complete Use Case Details</Typography>
+                            
+                            <Box sx={{ mt: 2 }}>
+                              <Typography variant="subtitle2">ID:</Typography>
+                              <Typography variant="body2">{result.bestCandidate.UseCaseID}</Typography>
+                            </Box>
                             
                             <Box sx={{ mt: 2 }}>
                               <Typography variant="subtitle2">Mapped Solution:</Typography>
@@ -475,31 +523,10 @@ const PdfMatcher = () => {
                               </Box>
                             )}
                             
-                            {result.bestCandidate.ValueDrivers && (
-                              <Box sx={{ mt: 2 }}>
-                                <Typography variant="subtitle2">Value Drivers:</Typography>
-                                <Typography variant="body2">{result.bestCandidate.ValueDrivers}</Typography>
-                              </Box>
-                            )}
-                            
                             {result.bestCandidate.Enablers && (
                               <Box sx={{ mt: 2 }}>
                                 <Typography variant="subtitle2">Enablers:</Typography>
                                 <Typography variant="body2">{result.bestCandidate.Enablers}</Typography>
-                              </Box>
-                            )}
-                            
-                            {result.bestCandidate.BaselineWithoutAI && (
-                              <Box sx={{ mt: 2 }}>
-                                <Typography variant="subtitle2">Baseline without AI:</Typography>
-                                <Typography variant="body2">{result.bestCandidate.BaselineWithoutAI}</Typography>
-                              </Box>
-                            )}
-                            
-                            {result.bestCandidate.NewWorldWithAI && (
-                              <Box sx={{ mt: 2 }}>
-                                <Typography variant="subtitle2">New World (with AI):</Typography>
-                                <Typography variant="body2">{result.bestCandidate.NewWorldWithAI}</Typography>
                               </Box>
                             )}
                             
@@ -512,6 +539,44 @@ const PdfMatcher = () => {
                           </Paper>
                         </Grid>
                       </Grid>
+                      
+                      {/* Alternative candidates section */}
+                      {showAlternatives && result.alternativeCandidates && result.alternativeCandidates.length > 0 && (
+                        <Box sx={{ mt: 4 }}>
+                          <Typography variant="h6" gutterBottom>Alternative Candidates</Typography>
+                          <Divider sx={{ mb: 3 }} />
+                          
+                          <Grid container spacing={3}>
+                            {result.alternativeCandidates.map((candidate, index) => (
+                              <Grid item xs={12} md={6} key={candidate.UseCaseID || index}>
+                                <Paper elevation={2} sx={{ p: 2, height: '100%' }}>
+                                  <Typography variant="subtitle1">{candidate.UseCaseName}</Typography>
+                                  <Typography variant="body2" color="text.secondary" gutterBottom>
+                                    ID: {candidate.UseCaseID}
+                                  </Typography>
+                                  
+                                  <Box sx={{ mt: 2, mb: 2 }}>
+                                    <BasicSimilarityBar 
+                                      score={candidate.SimilarityScore} 
+                                      label="Similarity" 
+                                    />
+                                  </Box>
+                                  
+                                  <Box sx={{ mt: 2 }}>
+                                    <Typography variant="body2" sx={{ fontWeight: 'bold' }}>Mapped Solution:</Typography>
+                                    <Typography variant="body2" noWrap>{candidate.MappedSolution}</Typography>
+                                  </Box>
+                                  
+                                  <Box sx={{ mt: 1 }}>
+                                    <Typography variant="body2" sx={{ fontWeight: 'bold' }}>Challenge:</Typography>
+                                    <Typography variant="body2" noWrap>{candidate.Challenge}</Typography>
+                                  </Box>
+                                </Paper>
+                              </Grid>
+                            ))}
+                          </Grid>
+                        </Box>
+                      )}
                     </Box>
                   ) : (
                     // Match found
@@ -520,6 +585,21 @@ const PdfMatcher = () => {
                         <CheckCircleIcon color="success" sx={{ mr: 1 }} />
                         <Typography variant="h6">Match Found!</Typography>
                       </Box>
+                      
+                      {/* Alternative candidates button */}
+                      {result.alternativeCandidates && result.alternativeCandidates.length > 0 && (
+                        <Box sx={{ mt: 1, mb: 2, display: 'flex', justifyContent: 'flex-end' }}>
+                          <Button
+                            variant="outlined"
+                            startIcon={<CompareArrowsIcon />}
+                            onClick={handleToggleAlternatives}
+                            size="small"
+                          >
+                            {showAlternatives ? 'Hide' : 'Show'} Alternative Matches ({result.alternativeCandidates.length})
+                          </Button>
+                        </Box>
+                      )}
+                      
                       <Divider sx={{ my: 2 }} />
                       
                       {/* Side-by-side comparison for match found */}
@@ -528,111 +608,38 @@ const PdfMatcher = () => {
                         <Grid item xs={12} md={6}>
                           <Typography variant="h6" gutterBottom>Extracted Fields</Typography>
                           <ExtractedFieldsDisplay extractedFields={result.extractedFields || {}} />
+                          
+                          {/* PDF viewer */}
+                          {pdfDataUrl && (
+                            <Box sx={{ mt: 4 }}>
+                              <Typography variant="h6" gutterBottom>PDF Preview</Typography>
+                              <Paper elevation={1} sx={{ p: 1, height: 300 }}>
+                                <PdfViewer file={pdfDataUrl} />
+                              </Paper>
+                            </Box>
+                          )}
                         </Grid>
                         
-                        {/* Right side: Matched use case with field-by-field similarity */}
+                        {/* Right side: Matched use case with improved visualization */}
                         <Grid item xs={12} md={6}>
                           <Typography variant="h6" gutterBottom>Matched Use Case</Typography>
-                          <Paper elevation={3} sx={{ p: 2, mb: 2 }}>
-                            <Typography variant="h6">{result.UseCaseName}</Typography>
-                            <Typography variant="body2" color="text.secondary" paragraph>
-                              ID: {result.UseCaseID}
-                            </Typography>
-                            <Box sx={{ mt: 2 }}>
-                              <Typography variant="subtitle1">Overall Similarity Score:</Typography>
-                              <Box sx={{ display: 'flex', alignItems: 'center', mt: 1, mb: 2 }}>
-                                <Box sx={{ 
-                                  width: '100%', 
-                                  backgroundColor: '#e0e0e0', 
-                                  borderRadius: 1,
-                                  height: 15,
-                                  mr: 1
-                                }}>
-                                  <Box
-                                    sx={{
-                                      width: `${result.SimilarityScore * 100}%`,
-                                      height: '100%',
-                                      borderRadius: 1,
-                                      backgroundColor: getColorByScore(result.SimilarityScore)
-                                    }}
-                                  />
-                                </Box>
-                                <Typography variant="body2" sx={{ minWidth: 50 }}>
-                                  {(result.SimilarityScore * 100).toFixed(0)}%
-                                </Typography>
-                              </Box>
-                            </Box>
-                          </Paper>
-
-                          {/* Field-by-field similarity visualization */}
-                          <Paper elevation={3} sx={{ p: 2, mb: 2 }}>
-                            <Typography variant="subtitle1" sx={{ mb: 2 }}>Field Matching Details</Typography>
-                            
-                            {result.fieldSimilarities && Object.entries(result.fieldSimilarities).map(([key, field]) => (
-                              <Box key={key} sx={{ mb: 3 }}>
-                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
-                                  <Typography variant="body2" fontWeight="bold">
-                                    {field.fieldName} ({key})
-                                  </Typography>
-                                  <Typography variant="body2">
-                                    Match: {(field.score * 100).toFixed(0)}% (Weight: {field.weight * 100}%)
-                                  </Typography>
-                                </Box>
-                                
-                                <Box sx={{ 
-                                  width: '100%', 
-                                  backgroundColor: '#e0e0e0', 
-                                  borderRadius: 1,
-                                  height: 10,
-                                  mb: 1 
-                                }}>
-                                  <Box
-                                    sx={{
-                                      width: `${field.score * 100}%`,
-                                      height: '100%',
-                                      borderRadius: 1,
-                                      backgroundColor: getColorByScore(field.score)
-                                    }}
-                                  />
-                                </Box>
-                                
-                                <Grid container spacing={1}>
-                                  <Grid item xs={6}>
-                                    <Typography variant="caption" color="text.secondary">Form Field:</Typography>
-                                    <Typography variant="body2" 
-                                      sx={{ 
-                                        p: 1, 
-                                        backgroundColor: '#f5f5f5', 
-                                        borderRadius: 1,
-                                        height: 60,
-                                        overflow: 'auto'
-                                      }}
-                                    >
-                                      {field.extractedValue || '(empty)'}
-                                    </Typography>
-                                  </Grid>
-                                  <Grid item xs={6}>
-                                    <Typography variant="caption" color="text.secondary">Use Case Field:</Typography>
-                                    <Typography variant="body2" 
-                                      sx={{ 
-                                        p: 1, 
-                                        backgroundColor: '#f5f5f5', 
-                                        borderRadius: 1,
-                                        height: 60,
-                                        overflow: 'auto'
-                                      }}
-                                    >
-                                      {field.matchedValue || '(empty)'}
-                                    </Typography>
-                                  </Grid>
-                                </Grid>
-                              </Box>
-                            ))}
-                          </Paper>
-
-                          {/* Full use case details */}
+                          
+                          <SimilarityVisualization
+                            similarityScore={result.SimilarityScore}
+                            fieldSimilarities={result.fieldSimilarities}
+                            title={result.UseCaseName || result['Use Case Name']}
+                            aiEnhanced={result.aiEnhanced}
+                            visualizationType="all"
+                            matchingMatrix={result.matchingMatrix}
+                          />
+                          
                           <Paper elevation={3} sx={{ p: 2 }}>
                             <Typography variant="subtitle1" sx={{ mb: 2 }}>Complete Use Case Details</Typography>
+                            
+                            <Box sx={{ mt: 2 }}>
+                              <Typography variant="subtitle2">ID:</Typography>
+                              <Typography variant="body2">{result.UseCaseID}</Typography>
+                            </Box>
                             
                             <Box sx={{ mt: 2 }}>
                               <Typography variant="subtitle2">Mapped Solution:</Typography>
@@ -653,31 +660,10 @@ const PdfMatcher = () => {
                               </Box>
                             )}
                             
-                            {result.ValueDrivers && (
-                              <Box sx={{ mt: 2 }}>
-                                <Typography variant="subtitle2">Value Drivers:</Typography>
-                                <Typography variant="body2">{result.ValueDrivers}</Typography>
-                              </Box>
-                            )}
-                            
                             {result.Enablers && (
                               <Box sx={{ mt: 2 }}>
                                 <Typography variant="subtitle2">Enablers:</Typography>
                                 <Typography variant="body2">{result.Enablers}</Typography>
-                              </Box>
-                            )}
-                            
-                            {result.BaselineWithoutAI && (
-                              <Box sx={{ mt: 2 }}>
-                                <Typography variant="subtitle2">Baseline without AI:</Typography>
-                                <Typography variant="body2">{result.BaselineWithoutAI}</Typography>
-                              </Box>
-                            )}
-                            
-                            {result.NewWorldWithAI && (
-                              <Box sx={{ mt: 2 }}>
-                                <Typography variant="subtitle2">New World (with AI):</Typography>
-                                <Typography variant="body2">{result.NewWorldWithAI}</Typography>
                               </Box>
                             )}
                             
@@ -690,6 +676,44 @@ const PdfMatcher = () => {
                           </Paper>
                         </Grid>
                       </Grid>
+                      
+                      {/* Alternative candidates section */}
+                      {showAlternatives && result.alternativeCandidates && result.alternativeCandidates.length > 0 && (
+                        <Box sx={{ mt: 4 }}>
+                          <Typography variant="h6" gutterBottom>Alternative Matches</Typography>
+                          <Divider sx={{ mb: 3 }} />
+                          
+                          <Grid container spacing={3}>
+                            {result.alternativeCandidates.map((candidate, index) => (
+                              <Grid item xs={12} md={6} key={candidate.UseCaseID || index}>
+                                <Paper elevation={2} sx={{ p: 2, height: '100%' }}>
+                                  <Typography variant="subtitle1">{candidate.UseCaseName}</Typography>
+                                  <Typography variant="body2" color="text.secondary" gutterBottom>
+                                    ID: {candidate.UseCaseID}
+                                  </Typography>
+                                  
+                                  <Box sx={{ mt: 2, mb: 2 }}>
+                                    <BasicSimilarityBar 
+                                      score={candidate.SimilarityScore} 
+                                      label="Similarity" 
+                                    />
+                                  </Box>
+                                  
+                                  <Box sx={{ mt: 2 }}>
+                                    <Typography variant="body2" sx={{ fontWeight: 'bold' }}>Mapped Solution:</Typography>
+                                    <Typography variant="body2" noWrap>{candidate.MappedSolution}</Typography>
+                                  </Box>
+                                  
+                                  <Box sx={{ mt: 1 }}>
+                                    <Typography variant="body2" sx={{ fontWeight: 'bold' }}>Challenge:</Typography>
+                                    <Typography variant="body2" noWrap>{candidate.Challenge}</Typography>
+                                  </Box>
+                                </Paper>
+                              </Grid>
+                            ))}
+                          </Grid>
+                        </Box>
+                      )}
                     </Box>
                   )}
                 </CardContent>
@@ -705,6 +729,13 @@ const PdfMatcher = () => {
                 pdfFileName={result.pdfFileName}
               />
             )}
+            
+            {/* Similarity Weights Settings Dialog */}
+            <SimilarityWeightSettings
+              open={weightsDialogOpen}
+              onClose={handleCloseWeightsDialog}
+              onSave={handleSaveWeights}
+            />
           </Box>
         )}
 

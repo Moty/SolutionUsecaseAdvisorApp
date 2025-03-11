@@ -1,7 +1,7 @@
 const express = require('express');
 const path = require('path');
 const multer = require('multer');
-const { matchPdfToUseCase } = require('../pdfMatcher');
+const { matchPdfToUseCase, getUserConfiguredWeights, saveUserConfiguredWeights, DEFAULT_WEIGHTS } = require('../pdfMatcher');
 const solutionsService = require('../services/solutionsService');
 
 // Set up multer for file uploads
@@ -246,6 +246,92 @@ router.post('/filter-history', express.json(), async (req, res) => {
   }
 });
 
+// SIMILARITY WEIGHTS ENDPOINTS
+
+/**
+ * GET /api/similarity-weights - Get current similarity weights
+ * 
+ * Returns the currently configured weights used for similarity calculations.
+ * If no custom weights are set, returns the default weights.
+ */
+router.get('/similarity-weights', async (req, res) => {
+  try {
+    const weights = getUserConfiguredWeights();
+    res.json({ 
+      weights,
+      isDefault: JSON.stringify(weights) === JSON.stringify(DEFAULT_WEIGHTS)
+    });
+  } catch (error) {
+    console.error('Error getting similarity weights:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+/**
+ * POST /api/similarity-weights - Save new similarity weights
+ * 
+ * Updates the weights used for similarity calculations.
+ * Expects a JSON body with weights for each field.
+ */
+router.post('/similarity-weights', express.json(), async (req, res) => {
+  try {
+    const { weights } = req.body;
+    
+    if (!weights || typeof weights !== 'object') {
+      return res.status(400).json({ message: 'Invalid weights format' });
+    }
+    
+    // Validate weights (must have all required fields and sum to 1.0)
+    const requiredFields = ['focusArea', 'process', 'affected', 'improvement', 'howToImprove'];
+    const missingFields = requiredFields.filter(field => weights[field] === undefined);
+    
+    if (missingFields.length > 0) {
+      return res.status(400).json({ 
+        message: 'Missing required weight fields', 
+        missingFields 
+      });
+    }
+    
+    // Convert to numbers and check if they're valid
+    const numericWeights = {};
+    requiredFields.forEach(field => {
+      numericWeights[field] = parseFloat(weights[field]);
+      if (isNaN(numericWeights[field]) || numericWeights[field] < 0) {
+        return res.status(400).json({ 
+          message: 'Invalid weight value', 
+          field,
+          value: weights[field]
+        });
+      }
+    });
+    
+    // Check if weights sum to approximately 1.0 (allow for floating point imprecision)
+    const sum = Object.values(numericWeights).reduce((a, b) => a + b, 0);
+    if (Math.abs(sum - 1.0) > 0.01) {
+      return res.status(400).json({ 
+        message: 'Weight values must sum to 1.0', 
+        sum,
+        weights: numericWeights
+      });
+    }
+    
+    // Save the new weights
+    const success = saveUserConfiguredWeights(numericWeights);
+    
+    if (!success) {
+      return res.status(500).json({ message: 'Failed to save weights' });
+    }
+    
+    res.json({ 
+      success: true, 
+      weights: numericWeights 
+    });
+  } catch (error) {
+    console.error('Error saving similarity weights:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // PDF MATCHING ENDPOINT
 
 /**
@@ -257,6 +343,8 @@ router.post('/filter-history', express.json(), async (req, res) => {
  * Request:
  * - multipart/form-data with a 'pdf' file field
  * - optional 'threshold' field (number between 0-1, default: 0.6)
+ * - optional 'useAI' field (boolean, default: true)
+ * - optional 'customWeights' field (JSON object with field weights)
  * 
  * Response:
  * - JSON object with the best matching use case and similarity score
@@ -278,8 +366,29 @@ router.post('/match-pdf', upload.single('pdf'), async (req, res) => {
     // Get the original filename
     const originalFilename = req.file.originalname;
     
+    // Get AI matching preference (default: true)
+    const useAI = req.body.useAI !== undefined ? (req.body.useAI === 'true' || req.body.useAI === true) : true;
+    
+    // Get custom weights if provided
+    let customWeights = null;
+    if (req.body.customWeights) {
+      try {
+        customWeights = JSON.parse(req.body.customWeights);
+      } catch (error) {
+        console.warn('Invalid custom weights format:', error);
+      }
+    }
+    
+    // Log the matching parameters
+    console.log('PDF Matching Parameters:', {
+      threshold,
+      useAI,
+      customWeights: customWeights ? 'custom' : 'default',
+      originalFilename
+    });
+    
     // Match the PDF to existing use cases
-    const match = await matchPdfToUseCase(pdfPath, threshold, originalFilename);
+    const match = await matchPdfToUseCase(pdfPath, threshold, originalFilename, customWeights, useAI);
     
     // Ensure the original filename is set in the response
     if (!match.pdfFileName) {
