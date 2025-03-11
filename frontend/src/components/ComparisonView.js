@@ -113,11 +113,14 @@ const ComparisonView = ({
     );
   };
   
-  if (!matchResult || !matchResult.pillarSimilarities) {
-    return <Typography>No comparison data available</Typography>;
-  }
+  // Check if we have match result data available
+  const hasMatchData = matchResult && matchResult.pillarSimilarities;
   
-  const overallScore = (matchResult.similarityScore * 100).toFixed(1);
+  // Data for match scoring section
+  let overallScore = "N/A";
+  if (hasMatchData) {
+    overallScore = (matchResult.similarityScore * 100).toFixed(1);
+  }
   
   return (
     <Box>
@@ -190,7 +193,7 @@ const ComparisonView = ({
       </Grid>
       
       {/* Comparison table */}
-      <TableContainer component={Paper} elevation={2}>
+      <TableContainer component={Paper} elevation={2} sx={{ mb: 3 }}>
         <Table>
           <TableHead>
             <TableRow>
@@ -234,15 +237,22 @@ const ComparisonView = ({
         </Table>
       </TableContainer>
 
-      <Card sx={{ p: 2, mb: 2 }}>
-        <Typography variant="h5" gutterBottom>
-          Overall Match: {overallScore}%
-        </Typography>
-        <Divider sx={{ mb: 2 }} />
-        {Object.entries(matchResult.pillarSimilarities).map(([pillar, data]) => (
-          <PillarScoreDisplay key={pillar} pillarName={pillar} pillarData={data} />
-        ))}
-      </Card>
+      {/* Match scoring section - only show if we have match data */}
+      {hasMatchData ? (
+        <Card sx={{ p: 2, mb: 2 }}>
+          <Typography variant="h5" gutterBottom>
+            Overall Match: {overallScore}%
+          </Typography>
+          <Divider sx={{ mb: 2 }} />
+          {Object.entries(matchResult.pillarSimilarities).map(([pillar, data]) => (
+            <PillarScoreDisplay key={pillar} pillarName={pillar} pillarData={data} />
+          ))}
+        </Card>
+      ) : (
+        <Alert severity="info" sx={{ mb: 3 }}>
+          No similarity matching data is available for these solutions.
+        </Alert>
+      )}
     </Box>
   );
 };

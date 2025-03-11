@@ -175,29 +175,48 @@ function App() {
     getSolutions();
   }, [filters]);
   
+  // Add state to store match data for comparison
+  const [matchData, setMatchData] = useState(null);
+  
   // Load user data (favorites, annotations, ratings, etc.)
   useEffect(() => {
     const loadUserData = async () => {
       try {
-        // Load favorites
-        const favoritesData = await fetchFavorites();
-        setFavorites(favoritesData);
+        console.log('Loading user data...');
         
-        // Load annotations
-        const annotationsData = await fetchAnnotations();
-        setAnnotations(annotationsData);
+        // Load favorites with priority
+        try {
+          const favoritesData = await fetchFavorites();
+          console.log('Loaded favorites:', favoritesData);
+          setFavorites(favoritesData);
+        } catch (favError) {
+          console.error('Error loading favorites:', favError);
+        }
         
-        // Load ratings
-        const ratingsData = await fetchRatings();
-        setRatings(ratingsData);
+        // Load other user data in parallel
+        await Promise.all([
+          // Load annotations
+          fetchAnnotations()
+            .then(setAnnotations)
+            .catch(err => console.error('Error loading annotations:', err)),
+          
+          // Load ratings
+          fetchRatings()
+            .then(setRatings)
+            .catch(err => console.error('Error loading ratings:', err)),
+          
+          // Load ratings summary
+          fetchRatingsSummary()
+            .then(setRatingsSummary)
+            .catch(err => console.error('Error loading ratings summary:', err)),
+          
+          // Load filter history
+          fetchFilterHistory()
+            .then(setFilterHistory)
+            .catch(err => console.error('Error loading filter history:', err)),
+        ]);
         
-        // Load ratings summary
-        const summaryData = await fetchRatingsSummary();
-        setRatingsSummary(summaryData);
-        
-        // Load filter history
-        const historyData = await fetchFilterHistory();
-        setFilterHistory(historyData);
+        console.log('User data loaded successfully');
       } catch (error) {
         console.error('Error loading user data:', error);
       }
@@ -266,7 +285,7 @@ function App() {
   };
   
   // Toggle selection for comparison
-  const handleToggleComparison = (useCaseId) => {
+  const handleToggleComparison = (useCaseId, matchResult = null) => {
     setSelectedForComparison(prev => {
       if (prev.includes(useCaseId)) {
         return prev.filter(id => id !== useCaseId);
@@ -278,6 +297,11 @@ function App() {
         return [...prev, useCaseId];
       }
     });
+    
+    // If a match result is provided, store it for the comparison view
+    if (matchResult) {
+      setMatchData(matchResult);
+    }
   };
   
   // Update dashboard preferences
@@ -450,6 +474,7 @@ function App() {
                     onRemoveFromComparison={handleToggleComparison}
                     favorites={favorites}
                     onToggleFavorite={handleToggleFavorite}
+                    matchResult={matchData}
                   />
                 )}
                 

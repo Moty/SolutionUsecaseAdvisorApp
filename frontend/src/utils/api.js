@@ -94,12 +94,25 @@ export const getExportUrl = (filters = {}) => {
  * @returns {Promise<Array>} - Array of favorite use case IDs
  */
 export const fetchFavorites = async (userId = DEFAULT_USER_ID) => {
+  const localStorageKey = `favorites_${userId}`;
+  
   try {
+    // Try to fetch from API
     const response = await axios.get(`${API_URL}/favorites`, { params: { userId } });
-    return response.data[userId] || [];
+    const favoritesArray = response.data[userId] || [];
+    
+    // Save to local storage as backup
+    saveToLocalStorage(localStorageKey, favoritesArray);
+    
+    return favoritesArray;
   } catch (error) {
     console.error('Error fetching favorites:', error);
-    return [];
+    
+    // Try to load from local storage as fallback
+    const localFavorites = loadFromLocalStorage(localStorageKey, []);
+    console.log('Loaded favorites from local storage:', localFavorites);
+    
+    return localFavorites;
   }
 };
 
@@ -110,12 +123,31 @@ export const fetchFavorites = async (userId = DEFAULT_USER_ID) => {
  * @returns {Promise<Object>} - Updated favorites
  */
 export const addFavorite = async (useCaseId, userId = DEFAULT_USER_ID) => {
+  const localStorageKey = `favorites_${userId}`;
+  
   try {
     const response = await axios.post(`${API_URL}/favorites`, { useCaseId, userId });
+    
+    // Save to local storage as backup
+    saveToLocalStorage(localStorageKey, response.data.favorites || []);
+    
     return response.data;
   } catch (error) {
     console.error('Error adding favorite:', error);
-    throw error;
+    
+    // Fallback to local storage if API fails
+    try {
+      const currentFavorites = loadFromLocalStorage(localStorageKey, []);
+      if (!currentFavorites.includes(useCaseId)) {
+        const updatedFavorites = [...currentFavorites, useCaseId];
+        saveToLocalStorage(localStorageKey, updatedFavorites);
+        return { favorites: updatedFavorites };
+      }
+      return { favorites: currentFavorites };
+    } catch (fallbackError) {
+      console.error('Fallback error:', fallbackError);
+      throw error; // Re-throw the original error
+    }
   }
 };
 
@@ -126,14 +158,30 @@ export const addFavorite = async (useCaseId, userId = DEFAULT_USER_ID) => {
  * @returns {Promise<Object>} - Updated favorites
  */
 export const removeFavorite = async (useCaseId, userId = DEFAULT_USER_ID) => {
+  const localStorageKey = `favorites_${userId}`;
+  
   try {
     const response = await axios.delete(`${API_URL}/favorites/${useCaseId}`, {
       params: { userId }
     });
+    
+    // Save to local storage as backup
+    saveToLocalStorage(localStorageKey, response.data.favorites || []);
+    
     return response.data;
   } catch (error) {
     console.error('Error removing favorite:', error);
-    throw error;
+    
+    // Fallback to local storage if API fails
+    try {
+      const currentFavorites = loadFromLocalStorage(localStorageKey, []);
+      const updatedFavorites = currentFavorites.filter(id => id !== useCaseId);
+      saveToLocalStorage(localStorageKey, updatedFavorites);
+      return { favorites: updatedFavorites };
+    } catch (fallbackError) {
+      console.error('Fallback error:', fallbackError);
+      throw error; // Re-throw the original error
+    }
   }
 };
 
