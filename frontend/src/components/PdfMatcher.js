@@ -33,6 +33,7 @@ import TuneIcon from '@mui/icons-material/Tune';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
 import SmartToyIcon from '@mui/icons-material/SmartToy';
+import InfoIcon from '@mui/icons-material/Info';
 import { styled } from '@mui/material/styles';
 import axios from 'axios';
 
@@ -128,6 +129,7 @@ const PdfMatcher = () => {
   const [weightsDialogOpen, setWeightsDialogOpen] = useState(false);
   const [customWeights, setCustomWeights] = useState(null);
   const [showAlternatives, setShowAlternatives] = useState(false);
+  const [expandedAlternative, setExpandedAlternative] = useState(null);
 
   // Handle file selection
   const handleFileSelect = (event) => {
@@ -255,6 +257,16 @@ const PdfMatcher = () => {
   // Toggle showing alternative candidates
   const handleToggleAlternatives = () => {
     setShowAlternatives(!showAlternatives);
+    setExpandedAlternative(null); // Reset expanded state when hiding/showing alternatives
+  };
+
+  // Toggle detailed matrix view for an alternative candidate
+  const handleToggleAlternativeDetails = (index) => {
+    if (expandedAlternative === index) {
+      setExpandedAlternative(null);
+    } else {
+      setExpandedAlternative(index);
+    }
   };
 
   // Handle tab change
@@ -594,6 +606,38 @@ const PdfMatcher = () => {
                                       {getUseCaseField(candidate, ['Challenge'])}
                                     </Typography>
                                   </Box>
+
+                                  {/* Button to toggle detailed matching matrix */}
+                                  {candidate.fieldSimilarities && candidate.matchingMatrix && (
+                                    <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center' }}>
+                                      <Button
+                                        variant="outlined"
+                                        size="small"
+                                        color="primary"
+                                        startIcon={<InfoIcon />}
+                                        onClick={() => handleToggleAlternativeDetails(index)}
+                                        sx={{ mt: 1 }}
+                                      >
+                                        {expandedAlternative === index ? 'Hide Details' : 'Show Match Details'}
+                                      </Button>
+                                    </Box>
+                                  )}
+
+                                  {/* Expanded details with matching matrix */}
+                                  <Collapse in={expandedAlternative === index}>
+                                    <Box sx={{ mt: 2 }}>
+                                      <Divider sx={{ my: 2 }} />
+                                      <Typography variant="subtitle2" gutterBottom>Matching Details</Typography>
+                                      <SimilarityVisualization
+                                        similarityScore={candidate.SimilarityScore}
+                                        fieldSimilarities={candidate.fieldSimilarities}
+                                        title={getUseCaseField(candidate, ['UseCaseName', 'Use Case Name'])}
+                                        aiEnhanced={result.aiEnhanced}
+                                        visualizationType="bars"
+                                        matchingMatrix={candidate.matchingMatrix}
+                                      />
+                                    </Box>
+                                  </Collapse>
                                 </Paper>
                               </Grid>
                             ))}
@@ -741,6 +785,38 @@ const PdfMatcher = () => {
                                       {getUseCaseField(candidate, ['Challenge'])}
                                     </Typography>
                                   </Box>
+
+                                  {/* Button to toggle detailed matching matrix */}
+                                  {candidate.fieldSimilarities && candidate.matchingMatrix && (
+                                    <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center' }}>
+                                      <Button
+                                        variant="outlined"
+                                        size="small"
+                                        color="primary"
+                                        startIcon={<InfoIcon />}
+                                        onClick={() => handleToggleAlternativeDetails(index)}
+                                        sx={{ mt: 1 }}
+                                      >
+                                        {expandedAlternative === index ? 'Hide Details' : 'Show Match Details'}
+                                      </Button>
+                                    </Box>
+                                  )}
+
+                                  {/* Expanded details with matching matrix */}
+                                  <Collapse in={expandedAlternative === index}>
+                                    <Box sx={{ mt: 2 }}>
+                                      <Divider sx={{ my: 2 }} />
+                                      <Typography variant="subtitle2" gutterBottom>Matching Details</Typography>
+                                      <SimilarityVisualization
+                                        similarityScore={candidate.SimilarityScore}
+                                        fieldSimilarities={candidate.fieldSimilarities}
+                                        title={getUseCaseField(candidate, ['UseCaseName', 'Use Case Name'])}
+                                        aiEnhanced={result.aiEnhanced}
+                                        visualizationType="bars"
+                                        matchingMatrix={candidate.matchingMatrix}
+                                      />
+                                    </Box>
+                                  </Collapse>
                                 </Paper>
                               </Grid>
                             ))}
