@@ -133,7 +133,7 @@ The application follows a modern client-server architecture:
 
 - Node.js (v14 or higher)
 - npm or yarn
-- MongoDB (local or cloud instance)
+- MongoDB (local or cloud instance) mongodb+srv://motymoshin:genai4s4hc@sapsolutionadvisor.dtujx.mongodb.net/
 - Tesseract (optional, for OCR functionality)
 
 ### Installation
