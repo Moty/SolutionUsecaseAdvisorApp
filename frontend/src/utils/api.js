@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
-const DEFAULT_USER_ID = 'default'; // In a real app, this would be the authenticated user's ID
+export const DEFAULT_USER_ID = 'default'; // In a real app, this would be the authenticated user's ID
 
 /**
  * Fetch solutions with optional filters

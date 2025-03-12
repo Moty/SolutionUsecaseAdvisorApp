@@ -41,7 +41,8 @@ import {
   fetchFilterHistory,
   saveFilterToHistory,
   saveToLocalStorage,
-  loadFromLocalStorage
+  loadFromLocalStorage,
+  DEFAULT_USER_ID
 } from './utils/api';
 
 // Create a theme
@@ -111,8 +112,19 @@ function App() {
     loadFromLocalStorage('viewMode', 'list') // 'list' or 'matrix'
   );
   
-  // New features state
-  const [favorites, setFavorites] = useState([]);
+  // Load favorites from local storage immediately for initial render
+  const initialFavorites = loadFromLocalStorage(`favorites_${DEFAULT_USER_ID}`, []);
+  
+  // New features state with additional debugging
+  const [favorites, setFavorites] = useState(initialFavorites);
+  
+  // Add a custom setFavorites function that logs changes
+  const updateFavorites = (newFavorites) => {
+    console.log('Favorites changing from', favorites, 'to', newFavorites);
+    console.trace('Favorites state update stack trace');
+    setFavorites(newFavorites);
+  };
+  const [favoritesLoading, setFavoritesLoading] = useState(true);
   const [annotations, setAnnotations] = useState({});
   const [ratings, setRatings] = useState({});
   const [ratingsSummary, setRatingsSummary] = useState({});
@@ -179,19 +191,63 @@ function App() {
   // Add state to store match data for comparison
   const [matchData, setMatchData] = useState(null);
   
+  // Effect for persisting favorites to local storage immediately on change
+  useEffect(() => {
+    // Skip the first render since initialFavorites already has localStorage data
+    if (favorites !== initialFavorites) {
+      console.log('Saving favorites to localStorage:', favorites);
+      saveToLocalStorage(`favorites_${DEFAULT_USER_ID}`, favorites);
+    }
+  }, [favorites, initialFavorites]);
+  
   // Load user data (favorites, annotations, ratings, etc.)
   useEffect(() => {
-    const loadUserData = async () => {
-      try {
-        console.log('Loading user data...');
-        
-        // Load favorites with priority
+    // Define a helper function to retry API calls
+    const retryApiCall = async (apiCall, maxRetries = 2, delay = 1000) => {
+      let lastError;
+      
+      for (let attempt = 0; attempt <= maxRetries; attempt++) {
         try {
-          const favoritesData = await fetchFavorites();
-          console.log('Loaded favorites:', favoritesData);
-          setFavorites(favoritesData);
+          return await apiCall();
+        } catch (error) {
+          console.error(`API call failed (attempt ${attempt + 1}/${maxRetries + 1}):`, error);
+          lastError = error;
+          
+          if (attempt < maxRetries) {
+            // Wait before retrying
+            await new Promise(resolve => setTimeout(resolve, delay));
+          }
+        }
+      }
+      
+      throw lastError;
+    };
+    
+    const loadUserData = async () => {
+      console.log('Loading user data...');
+      setFavoritesLoading(true);
+      
+      try {
+        // Load favorites with priority and retries
+        try {
+          const favoritesData = await retryApiCall(() => fetchFavorites());
+          console.log('Loaded favorites from API:', favoritesData);
+          
+          // Only update if we got data and it's different from our current state
+          // AND the API actually returned an array (important validation)
+          if (Array.isArray(favoritesData) && 
+              favoritesData.length > 0 && 
+              JSON.stringify(favoritesData) !== JSON.stringify(favorites)) {
+            console.log('Updating favorites from API response');
+            updateFavorites(favoritesData);
+          } else {
+            console.log('API returned empty or invalid favorites, keeping local data:', favorites);
+          }
         } catch (favError) {
-          console.error('Error loading favorites:', favError);
+          console.error('Failed to load favorites after retries:', favError);
+          // We already initialized with local storage, so no need to set here
+        } finally {
+          setFavoritesLoading(false);
         }
         
         // Load other user data in parallel
@@ -224,7 +280,7 @@ function App() {
     };
     
     loadUserData();
-  }, []);
+  }, []); // No dependencies to prevent re-running and potential race conditions
   
   // Save dashboard preferences when they change
   useEffect(() => {
@@ -245,17 +301,46 @@ function App() {
   const handleToggleFavorite = async (useCaseId) => {
     try {
       if (favorites.includes(useCaseId)) {
-        // Remove from favorites
+        // Remove from favorites - update UI immediately for better UX
+        const newFavorites = favorites.filter(id => id !== useCaseId);
+        console.log('Removing from favorites locally:', useCaseId);
+        updateFavorites(newFavorites);
+        
+        // Then update server
         const result = await removeFavorite(useCaseId);
-        setFavorites(result.favorites);
+        console.log('Server response for removing favorite:', result);
+        
+        // IMPORTANT: Only update from server if we got valid data
+        if (result && result.favorites && Array.isArray(result.favorites)) {
+          updateFavorites(result.favorites);
+        }
       } else {
-        // Add to favorites
+        // Add to favorites - update UI immediately
+        const newFavorites = [...favorites, useCaseId];
+        console.log('Adding to favorites locally:', useCaseId);
+        updateFavorites(newFavorites);
+        
+        // Then update server
         const result = await addFavorite(useCaseId);
-        setFavorites(result.favorites);
+        console.log('Server response for adding favorite:', result);
+        
+        // IMPORTANT: Only update from server if we got valid data
+        if (result && result.favorites && Array.isArray(result.favorites)) {
+          updateFavorites(result.favorites);
+        }
       }
     } catch (error) {
       console.error('Error toggling favorite:', error);
       setError('Failed to update favorites. Please try again.');
+      
+      // Revert the optimistic update on error
+      if (favorites.includes(useCaseId)) {
+        // We were removing, but failed - add it back
+        updateFavorites([...favorites, useCaseId]);
+      } else {
+        // We were adding, but failed - remove it
+        updateFavorites(favorites.filter(id => id !== useCaseId));
+      }
     }
   };
   
@@ -347,7 +432,27 @@ function App() {
   
   // Get solutions by IDs (for favorites and comparison)
   const getSolutionsByIds = (ids) => {
-    return solutions.filter(solution => ids.includes(solution['Use Case ID']));
+    if (!ids || ids.length === 0) {
+      return [];
+    }
+
+    console.log('GetSolutionsByIds called with:', ids);
+    console.log('Available solutions:', solutions);
+    
+    // If solutions aren't loaded yet but we have IDs, create placeholder objects
+    if (solutions.length === 0 && ids.length > 0) {
+      console.log('Creating placeholder solutions for:', ids);
+      return ids.map(id => ({
+        'Use Case ID': id,
+        'Use Case Name': `Loading... (${id})`,
+        'Loading': true
+      }));
+    }
+    
+    // Normal filtering when solutions are available
+    const result = solutions.filter(solution => ids.includes(solution['Use Case ID']));
+    console.log('Filtered solutions result:', result);
+    return result;
   };
 
   return (
