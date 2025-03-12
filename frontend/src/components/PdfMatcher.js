@@ -87,6 +87,19 @@ const getColorByScore = (score) => {
 };
 
 /**
+ * Helper function to get value from different possible property names
+ * This resolves issues with inconsistent field naming between backend and frontend
+ */
+const getUseCaseField = (useCase, fieldNames) => {
+  for (const fieldName of fieldNames) {
+    if (useCase[fieldName] !== undefined) {
+      return useCase[fieldName];
+    }
+  }
+  return '';
+};
+
+/**
  * PdfMatcher Component
  * 
  * This component allows users to upload a PDF file and find the best matching
@@ -490,7 +503,7 @@ const PdfMatcher = () => {
                           <SimilarityVisualization
                             similarityScore={result.bestCandidate.SimilarityScore}
                             fieldSimilarities={result.bestCandidate.fieldSimilarities}
-                            title={result.bestCandidate.UseCaseName || result.bestCandidate['Use Case Name']}
+                            title={getUseCaseField(result.bestCandidate, ['UseCaseName', 'Use Case Name'])}
                             aiEnhanced={result.aiEnhanced}
                             visualizationType="all"
                             matchingMatrix={result.bestCandidate.matchingMatrix}
@@ -501,12 +514,16 @@ const PdfMatcher = () => {
                             
                             <Box sx={{ mt: 2 }}>
                               <Typography variant="subtitle2">ID:</Typography>
-                              <Typography variant="body2">{result.bestCandidate.UseCaseID}</Typography>
+                              <Typography variant="body2">
+                                {getUseCaseField(result.bestCandidate, ['UseCaseID', 'Use Case ID'])}
+                              </Typography>
                             </Box>
                             
                             <Box sx={{ mt: 2 }}>
                               <Typography variant="subtitle2">Mapped Solution:</Typography>
-                              <Typography variant="body2">{result.bestCandidate.MappedSolution}</Typography>
+                              <Typography variant="body2">
+                                {getUseCaseField(result.bestCandidate, ['MappedSolution', 'Mapped Solution'])}
+                              </Typography>
                             </Box>
                             
                             {result.bestCandidate.Challenge && (
@@ -548,11 +565,13 @@ const PdfMatcher = () => {
                           
                           <Grid container spacing={3}>
                             {result.alternativeCandidates.map((candidate, index) => (
-                              <Grid item xs={12} md={6} key={candidate.UseCaseID || index}>
+                              <Grid item xs={12} md={6} key={index}>
                                 <Paper elevation={2} sx={{ p: 2, height: '100%' }}>
-                                  <Typography variant="subtitle1">{candidate.UseCaseName}</Typography>
+                                  <Typography variant="subtitle1">
+                                    {getUseCaseField(candidate, ['UseCaseName', 'Use Case Name'])}
+                                  </Typography>
                                   <Typography variant="body2" color="text.secondary" gutterBottom>
-                                    ID: {candidate.UseCaseID}
+                                    ID: {getUseCaseField(candidate, ['UseCaseID', 'Use Case ID'])}
                                   </Typography>
                                   
                                   <Box sx={{ mt: 2, mb: 2 }}>
@@ -564,12 +583,16 @@ const PdfMatcher = () => {
                                   
                                   <Box sx={{ mt: 2 }}>
                                     <Typography variant="body2" sx={{ fontWeight: 'bold' }}>Mapped Solution:</Typography>
-                                    <Typography variant="body2" noWrap>{candidate.MappedSolution}</Typography>
+                                    <Typography variant="body2" noWrap>
+                                      {getUseCaseField(candidate, ['MappedSolution', 'Mapped Solution'])}
+                                    </Typography>
                                   </Box>
                                   
                                   <Box sx={{ mt: 1 }}>
                                     <Typography variant="body2" sx={{ fontWeight: 'bold' }}>Challenge:</Typography>
-                                    <Typography variant="body2" noWrap>{candidate.Challenge}</Typography>
+                                    <Typography variant="body2" noWrap>
+                                      {getUseCaseField(candidate, ['Challenge'])}
+                                    </Typography>
                                   </Box>
                                 </Paper>
                               </Grid>
@@ -627,7 +650,7 @@ const PdfMatcher = () => {
                           <SimilarityVisualization
                             similarityScore={result.SimilarityScore}
                             fieldSimilarities={result.fieldSimilarities}
-                            title={result.UseCaseName || result['Use Case Name']}
+                            title={getUseCaseField(result, ['UseCaseName', 'Use Case Name'])}
                             aiEnhanced={result.aiEnhanced}
                             visualizationType="all"
                             matchingMatrix={result.matchingMatrix}
@@ -638,46 +661,50 @@ const PdfMatcher = () => {
                             
                             <Box sx={{ mt: 2 }}>
                               <Typography variant="subtitle2">ID:</Typography>
-                              <Typography variant="body2">{result.UseCaseID}</Typography>
+                              <Typography variant="body2">
+                                {getUseCaseField(result, ['UseCaseID', 'Use Case ID'])}
+                              </Typography>
                             </Box>
                             
                             <Box sx={{ mt: 2 }}>
                               <Typography variant="subtitle2">Mapped Solution:</Typography>
-                              <Typography variant="body2">{result.MappedSolution}</Typography>
+                              <Typography variant="body2">
+                                {getUseCaseField(result, ['MappedSolution', 'Mapped Solution'])}
+                              </Typography>
                             </Box>
                             
-                            {result.Challenge && (
-                              <Box sx={{ mt: 2 }}>
-                                <Typography variant="subtitle2">Challenge:</Typography>
-                                <Typography variant="body2">{result.Challenge}</Typography>
-                              </Box>
-                            )}
+                            <Box sx={{ mt: 2 }}>
+                              <Typography variant="subtitle2">Challenge:</Typography>
+                              <Typography variant="body2">
+                                {getUseCaseField(result, ['Challenge'])}
+                              </Typography>
+                            </Box>
                             
-                            {result.UserRole && (
-                              <Box sx={{ mt: 2 }}>
-                                <Typography variant="subtitle2">User Role:</Typography>
-                                <Typography variant="body2">{result.UserRole}</Typography>
-                              </Box>
-                            )}
+                            <Box sx={{ mt: 2 }}>
+                              <Typography variant="subtitle2">User Role:</Typography>
+                              <Typography variant="body2">
+                                {getUseCaseField(result, ['UserRole', 'User Role'])}
+                              </Typography>
+                            </Box>
                             
-                            {result.Enablers && (
-                              <Box sx={{ mt: 2 }}>
-                                <Typography variant="subtitle2">Enablers:</Typography>
-                                <Typography variant="body2">{result.Enablers}</Typography>
-                              </Box>
-                            )}
+                            <Box sx={{ mt: 2 }}>
+                              <Typography variant="subtitle2">Enablers:</Typography>
+                              <Typography variant="body2">
+                                {getUseCaseField(result, ['Enablers'])}
+                              </Typography>
+                            </Box>
                             
-                            {result.KeyBenefits && (
-                              <Box sx={{ mt: 2 }}>
-                                <Typography variant="subtitle2">Key Benefits:</Typography>
-                                <Typography variant="body2">{result.KeyBenefits}</Typography>
-                              </Box>
-                            )}
+                            <Box sx={{ mt: 2 }}>
+                              <Typography variant="subtitle2">Key Benefits:</Typography>
+                              <Typography variant="body2">
+                                {getUseCaseField(result, ['KeyBenefits', 'Key Benefits'])}
+                              </Typography>
+                            </Box>
                           </Paper>
                         </Grid>
                       </Grid>
                       
-                      {/* Alternative candidates section */}
+                      {/* Alternative matches section */}
                       {showAlternatives && result.alternativeCandidates && result.alternativeCandidates.length > 0 && (
                         <Box sx={{ mt: 4 }}>
                           <Typography variant="h6" gutterBottom>Alternative Matches</Typography>
@@ -685,11 +712,13 @@ const PdfMatcher = () => {
                           
                           <Grid container spacing={3}>
                             {result.alternativeCandidates.map((candidate, index) => (
-                              <Grid item xs={12} md={6} key={candidate.UseCaseID || index}>
+                              <Grid item xs={12} md={6} key={index}>
                                 <Paper elevation={2} sx={{ p: 2, height: '100%' }}>
-                                  <Typography variant="subtitle1">{candidate.UseCaseName}</Typography>
+                                  <Typography variant="subtitle1">
+                                    {getUseCaseField(candidate, ['UseCaseName', 'Use Case Name'])}
+                                  </Typography>
                                   <Typography variant="body2" color="text.secondary" gutterBottom>
-                                    ID: {candidate.UseCaseID}
+                                    ID: {getUseCaseField(candidate, ['UseCaseID', 'Use Case ID'])}
                                   </Typography>
                                   
                                   <Box sx={{ mt: 2, mb: 2 }}>
@@ -701,12 +730,16 @@ const PdfMatcher = () => {
                                   
                                   <Box sx={{ mt: 2 }}>
                                     <Typography variant="body2" sx={{ fontWeight: 'bold' }}>Mapped Solution:</Typography>
-                                    <Typography variant="body2" noWrap>{candidate.MappedSolution}</Typography>
+                                    <Typography variant="body2" noWrap>
+                                      {getUseCaseField(candidate, ['MappedSolution', 'Mapped Solution'])}
+                                    </Typography>
                                   </Box>
                                   
                                   <Box sx={{ mt: 1 }}>
                                     <Typography variant="body2" sx={{ fontWeight: 'bold' }}>Challenge:</Typography>
-                                    <Typography variant="body2" noWrap>{candidate.Challenge}</Typography>
+                                    <Typography variant="body2" noWrap>
+                                      {getUseCaseField(candidate, ['Challenge'])}
+                                    </Typography>
                                   </Box>
                                 </Paper>
                               </Grid>
