@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   Typography, 
   Box, 
@@ -36,8 +36,21 @@ const FavoritesPanel = ({
   selectedForComparison = [],
   onToggleComparison
 }) => {
+  // Keep a local copy of solutions to prevent UI flashing
+  const [localSolutions, setLocalSolutions] = useState(solutions);
+  
+  // Update local solutions when props change
+  useEffect(() => {
+    console.log("FavoritesPanel received solutions:", solutions);
+    if (solutions && solutions.length > 0) {
+      setLocalSolutions(solutions);
+    }
+  }, [solutions]);
+  
+  // Use local state for rendering to prevent UI flashing
+  const solutionsToRender = localSolutions.length > 0 ? localSolutions : solutions;
   // If no favorites, display a message
-  if (!solutions || solutions.length === 0) {
+  if (!solutionsToRender || solutionsToRender.length === 0) {
     return (
       <Box sx={{ textAlign: 'center', py: 5 }}>
         <SentimentDissatisfiedIcon sx={{ fontSize: 60, color: 'text.secondary', mb: 2 }} />
@@ -65,7 +78,7 @@ const FavoritesPanel = ({
       </Alert>
       
       <Grid container spacing={2}>
-        {solutions.map((solution) => {
+        {solutionsToRender.map((solution) => {
           const useCaseId = solution['Use Case ID'];
           return (
             <Grid item xs={12} key={useCaseId}>

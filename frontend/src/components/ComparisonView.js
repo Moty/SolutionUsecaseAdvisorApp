@@ -14,7 +14,11 @@ import {
   Chip,
   Tooltip,
   Alert,
-  Divider
+  Divider,
+  Card,
+  List,
+  ListItem,
+  ListItemText
 } from '@mui/material';
 import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -33,7 +37,8 @@ const ComparisonView = ({
   solutions = [],
   onRemoveFromComparison,
   favorites = [],
-  onToggleFavorite
+  onToggleFavorite,
+  matchResult
 }) => {
   // If no solutions are selected for comparison, display a message
   if (!solutions || solutions.length === 0) {
@@ -67,6 +72,55 @@ const ComparisonView = ({
     { label: 'Key Benefits', key: 'Key Benefits' },
     { label: 'Mapped Solution', key: 'Mapped Solution' }
   ];
+  
+  const PillarScoreDisplay = ({ pillarName, pillarData }) => {
+    const score = (pillarData.score * 100).toFixed(1);
+    const getScoreColor = (score) => {
+      if (score >= 80) return 'success';
+      if (score >= 60) return 'warning';
+      return 'error';
+    };
+  
+    return (
+      <Box sx={{ mb: 2 }}>
+        <Typography variant="h6">
+          {pillarName.charAt(0).toUpperCase() + pillarName.slice(1)}
+          <Chip 
+            label={`${score}%`}
+            color={getScoreColor(score)}
+            size="small"
+            sx={{ ml: 1 }}
+          />
+        </Typography>
+        <List dense>
+          <ListItem>
+            <ListItemText 
+              primary="Main Field"
+              secondary={`${pillarData.details.mainField.extractedValue} → ${pillarData.details.mainField.matchedValue}`}
+            />
+          </ListItem>
+          {Object.entries(pillarData.details.relatedFields).map(([field, score]) => (
+            <ListItem key={field}>
+              <ListItemText 
+                primary={field.charAt(0).toUpperCase() + field.slice(1)}
+                secondary={`Similarity: ${(score * 100).toFixed(1)}%`}
+              />
+            </ListItem>
+          ))}
+        </List>
+        <Divider />
+      </Box>
+    );
+  };
+  
+  // Check if we have match result data available
+  const hasMatchData = matchResult && matchResult.pillarSimilarities;
+  
+  // Data for match scoring section
+  let overallScore = "N/A";
+  if (hasMatchData) {
+    overallScore = (matchResult.similarityScore * 100).toFixed(1);
+  }
   
   return (
     <Box>
@@ -139,7 +193,7 @@ const ComparisonView = ({
       </Grid>
       
       {/* Comparison table */}
-      <TableContainer component={Paper} elevation={2}>
+      <TableContainer component={Paper} elevation={2} sx={{ mb: 3 }}>
         <Table>
           <TableHead>
             <TableRow>
@@ -182,6 +236,23 @@ const ComparisonView = ({
           </TableBody>
         </Table>
       </TableContainer>
+
+      {/* Match scoring section - only show if we have match data */}
+      {hasMatchData ? (
+        <Card sx={{ p: 2, mb: 2 }}>
+          <Typography variant="h5" gutterBottom>
+            Overall Match: {overallScore}%
+          </Typography>
+          <Divider sx={{ mb: 2 }} />
+          {Object.entries(matchResult.pillarSimilarities).map(([pillar, data]) => (
+            <PillarScoreDisplay key={pillar} pillarName={pillar} pillarData={data} />
+          ))}
+        </Card>
+      ) : (
+        <Alert severity="info" sx={{ mb: 3 }}>
+          No similarity matching data is available for these solutions.
+        </Alert>
+      )}
     </Box>
   );
 };

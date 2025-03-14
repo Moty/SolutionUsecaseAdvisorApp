@@ -48,19 +48,25 @@ const SolutionTile = ({
 
   // Extract module from Use Case ID
   const getModule = (useCaseId) => {
-    return useCaseId.split('_')[0];
+    if (!useCaseId) return 'Unknown';
+    const parts = useCaseId.split('_');
+    return parts.length > 0 ? parts[0] : 'Unknown';
   };
   
   // Handle favorite toggle
   const handleFavoriteToggle = (e) => {
     e.stopPropagation(); // Prevent tile click
-    onToggleFavorite(solution['Use Case ID']);
+    if (solution && solution['Use Case ID']) {
+      onToggleFavorite(solution['Use Case ID']);
+    }
   };
   
   // Handle comparison toggle
   const handleComparisonToggle = (e) => {
     e.stopPropagation(); // Prevent tile click
-    onToggleComparison(solution['Use Case ID']);
+    if (solution && solution['Use Case ID']) {
+      onToggleComparison(solution['Use Case ID']);
+    }
   };
   
   // Handle rating click
@@ -133,7 +139,7 @@ const SolutionTile = ({
             {/* Module chip */}
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 1 }}>
               <Chip 
-                label={getModule(solution['Use Case ID'])} 
+                label={getModule(solution && solution['Use Case ID'])} 
                 size="small" 
                 color="primary" 
                 sx={{ fontWeight: 500 }}
@@ -156,7 +162,7 @@ const SolutionTile = ({
                 lineHeight: '1.2em'
               }}
             >
-              {solution['Use Case Name']}
+              {solution && solution['Use Case Name'] ? solution['Use Case Name'] : 'Unnamed Solution'}
             </Typography>
             
             {/* User role */}
@@ -171,7 +177,7 @@ const SolutionTile = ({
                 whiteSpace: 'nowrap'
               }}
             >
-              <strong>Role:</strong> {solution['User Role']}
+              <strong>Role:</strong> {solution && solution['User Role'] ? solution['User Role'] : 'N/A'}
             </Typography>
             
             {/* Challenge - truncated */}
@@ -187,7 +193,7 @@ const SolutionTile = ({
                 WebkitBoxOrient: 'vertical'
               }}
             >
-              <strong>Challenge:</strong> {solution['Challenge']}
+              <strong>Challenge:</strong> {solution && solution['Challenge'] ? solution['Challenge'] : 'N/A'}
             </Typography>
             
             {/* Key benefit - truncated */}
@@ -202,7 +208,7 @@ const SolutionTile = ({
                 WebkitBoxOrient: 'vertical'
               }}
             >
-              <strong>Key Benefit:</strong> {solution['Key Benefits']}
+              <strong>Key Benefit:</strong> {solution && solution['Key Benefits'] ? solution['Key Benefits'] : 'N/A'}
             </Typography>
             
             {/* Rating summary if available */}
@@ -287,47 +293,47 @@ const SolutionTile = ({
       >
         <Paper sx={{ p: 2 }}>
           <Typography variant="h6" gutterBottom>
-            {solution['Use Case Name']}
+            {solution && solution['Use Case Name'] ? solution['Use Case Name'] : 'Unnamed Solution'}
           </Typography>
           
           <Typography variant="body2" paragraph>
-            <strong>ID:</strong> {solution['Use Case ID']}
+            <strong>ID:</strong> {solution && solution['Use Case ID'] ? solution['Use Case ID'] : 'N/A'}
           </Typography>
           
           <Typography variant="body2" paragraph>
-            <strong>User Role:</strong> {solution['User Role']}
+            <strong>User Role:</strong> {solution && solution['User Role'] ? solution['User Role'] : 'N/A'}
           </Typography>
           
           <Typography variant="body2" paragraph>
-            <strong>Challenge:</strong> {solution['Challenge']}
+            <strong>Challenge:</strong> {solution && solution['Challenge'] ? solution['Challenge'] : 'N/A'}
           </Typography>
           
-          {solution['Value Drivers'] && (
+          {solution && solution['Value Drivers'] && (
             <Typography variant="body2" paragraph>
               <strong>Value Drivers:</strong> {solution['Value Drivers']}
             </Typography>
           )}
           
-          {solution['Enablers'] && (
+          {solution && solution['Enablers'] && (
             <Typography variant="body2" paragraph>
               <strong>Enablers:</strong> {solution['Enablers']}
             </Typography>
           )}
           
-          {solution['Baseline without AI'] && (
+          {solution && solution['Baseline without AI'] && (
             <Typography variant="body2" paragraph>
               <strong>Baseline without AI:</strong> {solution['Baseline without AI']}
             </Typography>
           )}
           
-          {solution['New World (with AI)'] && (
+          {solution && solution['New World (with AI)'] && (
             <Typography variant="body2" paragraph>
               <strong>New World (with AI):</strong> {solution['New World (with AI)']}
             </Typography>
           )}
           
           <Typography variant="body2">
-            <strong>Key Benefits:</strong> {solution['Key Benefits']}
+            <strong>Key Benefits:</strong> {solution && solution['Key Benefits'] ? solution['Key Benefits'] : 'N/A'}
           </Typography>
         </Paper>
       </Popover>

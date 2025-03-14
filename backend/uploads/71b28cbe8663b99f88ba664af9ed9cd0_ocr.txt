@@ -1,0 +1,7 @@
+{
+  "focusArea": "SAP Field Service Management, Equipment Insights",
+  "processToImprove": "Improved first-call resolution; reduced downtime",
+  "affectedRoles": "Field Service Worker / Dispatcher",
+  "improvementNeed": "need quick access to equipment history and performance data to select the right technician",
+  "howToImprove": "AI-driven extraction of equipment data and performance patterns"
+}

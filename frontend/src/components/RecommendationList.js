@@ -151,7 +151,9 @@ const SolutionCard = ({
   
   // Extract module from Use Case ID
   const getModule = (useCaseId) => {
-    return useCaseId.split('_')[0];
+    if (!useCaseId) return 'Unknown';
+    const parts = useCaseId.split('_');
+    return parts.length > 0 ? parts[0] : 'Unknown';
   };
   
   // Toggle expanded state
@@ -161,12 +163,16 @@ const SolutionCard = ({
   
   // Handle favorite toggle
   const handleFavoriteToggle = () => {
-    onToggleFavorite(solution['Use Case ID']);
+    if (solution && solution['Use Case ID']) {
+      onToggleFavorite(solution['Use Case ID']);
+    }
   };
   
   // Handle comparison toggle
   const handleComparisonToggle = () => {
-    onToggleComparison(solution['Use Case ID']);
+    if (solution && solution['Use Case ID']) {
+      onToggleComparison(solution['Use Case ID']);
+    }
   };
   
   // Handle annotation editing
@@ -247,7 +253,7 @@ const SolutionCard = ({
             {solution['Use Case Name']}
           </Typography>
           <Chip 
-            label={getModule(solution['Use Case ID'])} 
+            label={getModule(solution && solution['Use Case ID'])} 
             size="small" 
             color="primary" 
             sx={{ fontWeight: 500 }}
@@ -255,15 +261,15 @@ const SolutionCard = ({
         </Box>
         
         <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-          <strong>ID:</strong> {solution['Use Case ID']} | <strong>Role:</strong> {solution['User Role']}
+          <strong>ID:</strong> {solution && solution['Use Case ID'] ? solution['Use Case ID'] : 'N/A'} | <strong>Role:</strong> {solution && solution['User Role'] ? solution['User Role'] : 'N/A'}
         </Typography>
         
         <Typography variant="body2" sx={{ mb: 1 }}>
-          <strong>Challenge:</strong> {solution['Challenge']}
+          <strong>Challenge:</strong> {solution && solution['Challenge'] ? solution['Challenge'] : 'N/A'}
         </Typography>
         
         <Typography variant="body2">
-          <strong>Key Benefit:</strong> {solution['Key Benefits']}
+          <strong>Key Benefit:</strong> {solution && solution['Key Benefits'] ? solution['Key Benefits'] : 'N/A'}
         </Typography>
         
         {/* Display rating summary if available */}
@@ -301,25 +307,25 @@ const SolutionCard = ({
           <Grid container spacing={2}>
             <Grid item xs={12} md={6}>
               <Typography variant="body2" sx={{ mb: 1 }}>
-                <strong>Value Drivers:</strong> {solution['Value Drivers']}
+                <strong>Value Drivers:</strong> {solution && solution['Value Drivers'] ? solution['Value Drivers'] : 'N/A'}
               </Typography>
               
               <Typography variant="body2" sx={{ mb: 1 }}>
-                <strong>Enablers:</strong> {solution['Enablers']}
+                <strong>Enablers:</strong> {solution && solution['Enablers'] ? solution['Enablers'] : 'N/A'}
               </Typography>
             </Grid>
             
             <Grid item xs={12} md={6}>
               <Typography variant="body2" sx={{ mb: 1 }}>
-                <strong>Baseline without AI:</strong> {solution['Baseline without AI']}
+                <strong>Baseline without AI:</strong> {solution && solution['Baseline without AI'] ? solution['Baseline without AI'] : 'N/A'}
               </Typography>
               
               <Typography variant="body2" sx={{ mb: 1 }}>
-                <strong>New World (with AI):</strong> {solution['New World (with AI)']}
+                <strong>New World (with AI):</strong> {solution && solution['New World (with AI)'] ? solution['New World (with AI)'] : 'N/A'}
               </Typography>
               
               <Typography variant="body2" sx={{ mb: 1 }}>
-                <strong>Mapped Solution:</strong> {solution['Mapped Solution']}
+                <strong>Mapped Solution:</strong> {solution && solution['Mapped Solution'] ? solution['Mapped Solution'] : 'N/A'}
               </Typography>
             </Grid>
             
@@ -395,7 +401,7 @@ const SolutionCard = ({
         <DialogContent>
           <Box sx={{ my: 2 }}>
             <Typography variant="subtitle1" gutterBottom>
-              {solution['Use Case Name']}
+              {solution && solution['Use Case Name'] ? solution['Use Case Name'] : 'Unnamed Solution'}
             </Typography>
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
               <Typography component="legend" sx={{ mr: 2 }}>Your Rating:</Typography>

@@ -22,17 +22,6 @@
   },
   "filterHistory": [
     {
-      "id": "1740610731109",
-      "userId": "default",
-      "filters": {
-        "role": "",
-        "module": "",
-        "keyword": "closing"
-      },
-      "name": "",
-      "timestamp": "2025-02-26T22:58:51.109Z"
-    },
-    {
       "id": "1740610967782",
       "userId": "default",
       "filters": {
@@ -97,6 +86,50 @@
       },
       "name": "",
       "timestamp": "2025-02-28T14:42:27.395Z"
+    },
+    {
+      "id": "1740980537578",
+      "userId": "default",
+      "filters": {
+        "role": "",
+        "module": "",
+        "keyword": "closing"
+      },
+      "name": "",
+      "timestamp": "2025-03-03T05:42:17.578Z"
+    },
+    {
+      "id": "1740981301285",
+      "userId": "default",
+      "filters": {
+        "role": "Internal Auditor",
+        "module": "",
+        "keyword": "closing"
+      },
+      "name": "",
+      "timestamp": "2025-03-03T05:55:01.285Z"
+    },
+    {
+      "id": "1740981307260",
+      "userId": "default",
+      "filters": {
+        "role": "Internal Auditor",
+        "module": "",
+        "keyword": ""
+      },
+      "name": "",
+      "timestamp": "2025-03-03T05:55:07.260Z"
+    },
+    {
+      "id": "1740982358868",
+      "userId": "default",
+      "filters": {
+        "role": "",
+        "module": "MM",
+        "keyword": ""
+      },
+      "name": "",
+      "timestamp": "2025-03-03T06:12:38.868Z"
     }
   ]
 }

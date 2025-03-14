@@ -15,7 +15,13 @@ import {
   AlertTitle,
   Tabs,
   Tab,
-  Link
+  Link,
+  Switch,
+  FormControlLabel,
+  Collapse,
+  IconButton,
+  Tooltip,
+  Stack
 } from '@mui/material';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import DescriptionIcon from '@mui/icons-material/Description';
@@ -23,6 +29,11 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ErrorIcon from '@mui/icons-material/Error';
 import SaveIcon from '@mui/icons-material/Save';
 import DownloadIcon from '@mui/icons-material/Download';
+import TuneIcon from '@mui/icons-material/Tune';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
+import SmartToyIcon from '@mui/icons-material/SmartToy';
+import InfoIcon from '@mui/icons-material/Info';
 import { styled } from '@mui/material/styles';
 import axios from 'axios';
 
@@ -31,6 +42,8 @@ import PdfViewer from './PdfViewer';
 import ExtractedFieldsDisplay from './ExtractedFieldsDisplay';
 import SaveNewUseCaseForm from './SaveNewUseCaseForm';
 import NewUseCasesList from './NewUseCasesList';
+import SimilarityWeightSettings from './SimilarityWeightSettings';
+import { SimilarityVisualization, BasicSimilarityBar } from './SimilarityVisualization';
 
 // Styled components
 const UploadBox = styled(Paper)(({ theme }) => ({
@@ -67,11 +80,37 @@ const TemplateLink = styled(Link)(({ theme }) => ({
   }
 }));
 
+// Helper function to get color based on similarity score
+const getColorByScore = (score) => {
+  if (score >= 0.7) return '#4caf50'; // Green for good match
+  if (score >= 0.4) return '#ff9800'; // Orange for moderate match
+  return '#f44336'; // Red for poor match
+};
+
+/**
+ * Helper function to get value from different possible property names
+ * This resolves issues with inconsistent field naming between backend and frontend
+ */
+const getUseCaseField = (useCase, fieldNames) => {
+  for (const fieldName of fieldNames) {
+    if (useCase[fieldName] !== undefined) {
+      return useCase[fieldName];
+    }
+  }
+  return '';
+};
+
 /**
  * PdfMatcher Component
  * 
  * This component allows users to upload a PDF file and find the best matching
  * SAP use case based on the content of the PDF.
+ * 
+ * Enhanced with:
+ * - AI-based matching capabilities
+ * - Customizable similarity weights
+ * - Advanced visualizations for similarity scores
+ * - Alternative candidates when no match is found
  */
 const PdfMatcher = () => {
   // State variables
@@ -83,6 +122,14 @@ const PdfMatcher = () => {
   const [tabValue, setTabValue] = useState(0);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [pdfDataUrl, setPdfDataUrl] = useState(null);
+  
+  // New state variables for enhanced features
+  const [useAI, setUseAI] = useState(true);
+  const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
+  const [weightsDialogOpen, setWeightsDialogOpen] = useState(false);
+  const [customWeights, setCustomWeights] = useState(null);
+  const [showAlternatives, setShowAlternatives] = useState(false);
+  const [expandedAlternative, setExpandedAlternative] = useState(null);
 
   // Handle file selection
   const handleFileSelect = (event) => {
@@ -119,6 +166,27 @@ const PdfMatcher = () => {
     setThreshold(newValue);
   };
 
+  // Handle AI toggle change
+  const handleAIChange = (event) => {
+    setUseAI(event.target.checked);
+  };
+
+  // Handle weights dialog open
+  const handleOpenWeightsDialog = () => {
+    setWeightsDialogOpen(true);
+  };
+
+  // Handle weights dialog close
+  const handleCloseWeightsDialog = () => {
+    setWeightsDialogOpen(false);
+  };
+
+  // Handle weights save
+  const handleSaveWeights = (weights) => {
+    setCustomWeights(weights);
+    setWeightsDialogOpen(false);
+  };
+
   // Handle file upload and matching
   const handleUpload = async () => {
     if (!file) {
@@ -129,6 +197,7 @@ const PdfMatcher = () => {
     setLoading(true);
     setError(null);
     setResult(null);
+    setShowAlternatives(false);
 
     try {
       // Create a data URL for the PDF viewer
@@ -142,6 +211,12 @@ const PdfMatcher = () => {
       const formData = new FormData();
       formData.append('pdf', file);
       formData.append('threshold', threshold);
+      formData.append('useAI', useAI);
+      
+      // Add custom weights if available
+      if (customWeights) {
+        formData.append('customWeights', JSON.stringify(customWeights));
+      }
 
       // Send request to API
       const response = await axios.post('/api/match-pdf', formData, {
@@ -170,24 +245,27 @@ const PdfMatcher = () => {
 
       // Set result
       console.log('API Response:', response.data);
-      console.log('Extracted Fields:', response.data.extractedFields);
-      console.log('Original Filename:', response.data.pdfFileName);
-      console.log('Has extractedFields property:', response.data.hasOwnProperty('extractedFields'));
-      console.log('extractedFields type:', typeof response.data.extractedFields);
-      
-      if (response.data.extractedFields) {
-        console.log('extractedFields keys:', Object.keys(response.data.extractedFields));
-        console.log('extractedFields values:', Object.values(response.data.extractedFields));
-      } else {
-        console.log('extractedFields is null or undefined');
-      }
-      
       setResult(response.data);
     } catch (error) {
       console.error('Error matching PDF:', error);
       setError(error.response?.data?.message || 'Failed to match PDF. Please try again.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Toggle showing alternative candidates
+  const handleToggleAlternatives = () => {
+    setShowAlternatives(!showAlternatives);
+    setExpandedAlternative(null); // Reset expanded state when hiding/showing alternatives
+  };
+
+  // Toggle detailed matrix view for an alternative candidate
+  const handleToggleAlternativeDetails = (index) => {
+    if (expandedAlternative === index) {
+      setExpandedAlternative(null);
+    } else {
+      setExpandedAlternative(index);
     }
   };
 
@@ -281,31 +359,101 @@ const PdfMatcher = () => {
               </Alert>
             )}
 
-            {/* Threshold Slider */}
-            <Box sx={{ mt: 4 }}>
-              <Typography id="threshold-slider" gutterBottom>
-                Similarity Threshold: {threshold}
-              </Typography>
-              <Slider
-                value={threshold}
-                onChange={handleThresholdChange}
-                aria-labelledby="threshold-slider"
-                step={0.05}
-                marks
-                min={0}
-                max={1}
-                valueLabelDisplay="auto"
-              />
-              <Typography variant="body2" color="text.secondary">
-                Lower values will return matches with less similarity. Higher values require closer matches.
-              </Typography>
+            {/* Matching Options */}
+            <Box sx={{ mt: 3 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Typography variant="h6">Matching Options</Typography>
+                <Button 
+                  startIcon={<ExpandMoreIcon 
+                    sx={{ 
+                      transform: showAdvancedOptions ? 'rotate(180deg)' : 'rotate(0deg)',
+                      transition: '0.3s'
+                    }} 
+                  />}
+                  onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
+                  size="small"
+                >
+                  {showAdvancedOptions ? 'Hide Advanced Options' : 'Show Advanced Options'}
+                </Button>
+              </Box>
+              
+              {/* Basic Options */}
+              <Box sx={{ mt: 2 }}>
+                <FormControlLabel
+                  control={
+                    <Switch 
+                      checked={useAI}
+                      onChange={handleAIChange}
+                      color="primary"
+                    />
+                  }
+                  label={
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                      <SmartToyIcon sx={{ mr: 1, fontSize: 18 }} />
+                      <Typography>Use AI-enhanced matching</Typography>
+                    </Box>
+                  }
+                />
+                <Tooltip title="AI-enhanced matching uses advanced NLP techniques to better understand the semantic meaning of your document content">
+                  <Box component="span" sx={{ ml: 1, color: 'primary.main', fontSize: '0.85rem' }}>
+                    (Recommended)
+                  </Box>
+                </Tooltip>
+              </Box>
+
+              {/* Threshold Slider */}
+              <Box sx={{ mt: 2 }}>
+                <Typography id="threshold-slider" gutterBottom>
+                  Similarity Threshold: {threshold}
+                </Typography>
+                <Slider
+                  value={threshold}
+                  onChange={handleThresholdChange}
+                  aria-labelledby="threshold-slider"
+                  step={0.05}
+                  marks
+                  min={0}
+                  max={1}
+                  valueLabelDisplay="auto"
+                  valueLabelFormat={(value) => `${(value * 100).toFixed(0)}%`}
+                />
+                <Typography variant="body2" color="text.secondary">
+                  Lower values will return matches with less similarity. Higher values require closer matches.
+                </Typography>
+              </Box>
+
+              {/* Advanced Options */}
+              <Collapse in={showAdvancedOptions}>
+                <Box sx={{ mt: 3, p: 2, bgcolor: 'background.default', borderRadius: 1 }}>
+                  <Typography variant="subtitle1" gutterBottom>Advanced Configuration</Typography>
+                  
+                  <Button
+                    variant="outlined"
+                    startIcon={<TuneIcon />}
+                    onClick={handleOpenWeightsDialog}
+                    sx={{ mt: 1 }}
+                    size="small"
+                  >
+                    Customize Similarity Weights
+                  </Button>
+                  
+                  {customWeights && (
+                    <Alert severity="info" sx={{ mt: 2 }}>
+                      <AlertTitle>Custom Weights Applied</AlertTitle>
+                      You are using custom weights for field matching. 
+                      Click the button above to modify them.
+                    </Alert>
+                  )}
+                </Box>
+              </Collapse>
             </Box>
 
             {/* Upload Button */}
-            <Box sx={{ mt: 2, textAlign: 'center' }}>
+            <Box sx={{ mt: 3, textAlign: 'center' }}>
               <Button
                 variant="contained"
                 color="primary"
+                size="large"
                 onClick={handleUpload}
                 disabled={!file || loading}
                 startIcon={loading ? <CircularProgress size={20} color="inherit" /> : null}
@@ -335,6 +483,21 @@ const PdfMatcher = () => {
                           Save as New Use Case
                         </Button>
                       </Box>
+                      
+                      {/* Alternative candidates button */}
+                      {result.alternativeCandidates && result.alternativeCandidates.length > 0 && (
+                        <Box sx={{ mt: 1, mb: 2, display: 'flex', justifyContent: 'flex-end' }}>
+                          <Button
+                            variant="outlined"
+                            startIcon={<CompareArrowsIcon />}
+                            onClick={handleToggleAlternatives}
+                            size="small"
+                          >
+                            {showAlternatives ? 'Hide' : 'Show'} Alternative Candidates ({result.alternativeCandidates.length})
+                          </Button>
+                        </Box>
+                      )}
+                      
                       <Divider sx={{ my: 2 }} />
                       
                       {/* Side-by-side comparison for no match */}
@@ -345,67 +508,142 @@ const PdfMatcher = () => {
                           <ExtractedFieldsDisplay extractedFields={result.extractedFields || {}} />
                         </Grid>
                         
-                        {/* Right side: Best candidate */}
+                        {/* Right side: Best candidate with improved visualization */}
                         <Grid item xs={12} md={6}>
                           <Typography variant="h6" gutterBottom>Best Candidate</Typography>
-                          <Paper elevation={3} sx={{ p: 2, height: '100%' }}>
-                            <Typography variant="h6">{result.bestCandidate.UseCaseName}</Typography>
-                            <Typography variant="body2" color="text.secondary" paragraph>
-                              ID: {result.bestCandidate.UseCaseID}
-                            </Typography>
+                          
+                          <SimilarityVisualization
+                            similarityScore={result.bestCandidate.SimilarityScore}
+                            fieldSimilarities={result.bestCandidate.fieldSimilarities}
+                            title={getUseCaseField(result.bestCandidate, ['UseCaseName', 'Use Case Name'])}
+                            aiEnhanced={result.aiEnhanced}
+                            visualizationType="all"
+                            matchingMatrix={result.bestCandidate.matchingMatrix}
+                          />
+                          
+                          <Paper elevation={3} sx={{ p: 2 }}>
+                            <Typography variant="subtitle1" sx={{ mb: 2 }}>Complete Use Case Details</Typography>
+                            
                             <Box sx={{ mt: 2 }}>
-                              <Typography variant="subtitle1">Similarity Score:</Typography>
-                              <Typography variant="body1">{result.bestCandidate.SimilarityScore}</Typography>
+                              <Typography variant="subtitle2">ID:</Typography>
+                              <Typography variant="body2">
+                                {getUseCaseField(result.bestCandidate, ['UseCaseID', 'Use Case ID'])}
+                              </Typography>
                             </Box>
+                            
                             <Box sx={{ mt: 2 }}>
-                              <Typography variant="subtitle1">Mapped Solution:</Typography>
-                              <Typography variant="body1">{result.bestCandidate.MappedSolution}</Typography>
+                              <Typography variant="subtitle2">Mapped Solution:</Typography>
+                              <Typography variant="body2">
+                                {getUseCaseField(result.bestCandidate, ['MappedSolution', 'Mapped Solution'])}
+                              </Typography>
                             </Box>
+                            
                             {result.bestCandidate.Challenge && (
                               <Box sx={{ mt: 2 }}>
-                                <Typography variant="subtitle1">Challenge:</Typography>
-                                <Typography variant="body1">{result.bestCandidate.Challenge}</Typography>
+                                <Typography variant="subtitle2">Challenge:</Typography>
+                                <Typography variant="body2">{result.bestCandidate.Challenge}</Typography>
                               </Box>
                             )}
+                            
                             {result.bestCandidate.UserRole && (
                               <Box sx={{ mt: 2 }}>
-                                <Typography variant="subtitle1">User Role:</Typography>
-                                <Typography variant="body1">{result.bestCandidate.UserRole}</Typography>
+                                <Typography variant="subtitle2">User Role:</Typography>
+                                <Typography variant="body2">{result.bestCandidate.UserRole}</Typography>
                               </Box>
                             )}
-                            {result.bestCandidate.ValueDrivers && (
-                              <Box sx={{ mt: 2 }}>
-                                <Typography variant="subtitle1">Value Drivers:</Typography>
-                                <Typography variant="body1">{result.bestCandidate.ValueDrivers}</Typography>
-                              </Box>
-                            )}
+                            
                             {result.bestCandidate.Enablers && (
                               <Box sx={{ mt: 2 }}>
-                                <Typography variant="subtitle1">Enablers:</Typography>
-                                <Typography variant="body1">{result.bestCandidate.Enablers}</Typography>
+                                <Typography variant="subtitle2">Enablers:</Typography>
+                                <Typography variant="body2">{result.bestCandidate.Enablers}</Typography>
                               </Box>
                             )}
-                            {result.bestCandidate.BaselineWithoutAI && (
-                              <Box sx={{ mt: 2 }}>
-                                <Typography variant="subtitle1">Baseline without AI:</Typography>
-                                <Typography variant="body1">{result.bestCandidate.BaselineWithoutAI}</Typography>
-                              </Box>
-                            )}
-                            {result.bestCandidate.NewWorldWithAI && (
-                              <Box sx={{ mt: 2 }}>
-                                <Typography variant="subtitle1">New World (with AI):</Typography>
-                                <Typography variant="body1">{result.bestCandidate.NewWorldWithAI}</Typography>
-                              </Box>
-                            )}
+                            
                             {result.bestCandidate.KeyBenefits && (
                               <Box sx={{ mt: 2 }}>
-                                <Typography variant="subtitle1">Key Benefits:</Typography>
-                                <Typography variant="body1">{result.bestCandidate.KeyBenefits}</Typography>
+                                <Typography variant="subtitle2">Key Benefits:</Typography>
+                                <Typography variant="body2">{result.bestCandidate.KeyBenefits}</Typography>
                               </Box>
                             )}
                           </Paper>
                         </Grid>
                       </Grid>
+                      
+                      {/* Alternative candidates section */}
+                      {showAlternatives && result.alternativeCandidates && result.alternativeCandidates.length > 0 && (
+                        <Box sx={{ mt: 4 }}>
+                          <Typography variant="h6" gutterBottom>Alternative Candidates</Typography>
+                          <Divider sx={{ mb: 3 }} />
+                          
+                          <Grid container spacing={3}>
+                            {result.alternativeCandidates.map((candidate, index) => (
+                              <Grid item xs={12} md={6} key={index}>
+                                <Paper elevation={2} sx={{ p: 2, height: '100%' }}>
+                                  <Typography variant="subtitle1">
+                                    {getUseCaseField(candidate, ['UseCaseName', 'Use Case Name'])}
+                                  </Typography>
+                                  <Typography variant="body2" color="text.secondary" gutterBottom>
+                                    ID: {getUseCaseField(candidate, ['UseCaseID', 'Use Case ID'])}
+                                  </Typography>
+                                  
+                                  <Box sx={{ mt: 2, mb: 2 }}>
+                                    <BasicSimilarityBar 
+                                      score={candidate.SimilarityScore} 
+                                      label="Similarity" 
+                                    />
+                                  </Box>
+                                  
+                                  <Box sx={{ mt: 2 }}>
+                                    <Typography variant="body2" sx={{ fontWeight: 'bold' }}>Mapped Solution:</Typography>
+                                    <Typography variant="body2" noWrap>
+                                      {getUseCaseField(candidate, ['MappedSolution', 'Mapped Solution'])}
+                                    </Typography>
+                                  </Box>
+                                  
+                                  <Box sx={{ mt: 1 }}>
+                                    <Typography variant="body2" sx={{ fontWeight: 'bold' }}>Challenge:</Typography>
+                                    <Typography variant="body2" noWrap>
+                                      {getUseCaseField(candidate, ['Challenge'])}
+                                    </Typography>
+                                  </Box>
+
+                                  {/* Button to toggle detailed matching matrix */}
+                                  {candidate.fieldSimilarities && candidate.matchingMatrix && (
+                                    <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center' }}>
+                                      <Button
+                                        variant="outlined"
+                                        size="small"
+                                        color="primary"
+                                        startIcon={<InfoIcon />}
+                                        onClick={() => handleToggleAlternativeDetails(index)}
+                                        sx={{ mt: 1 }}
+                                      >
+                                        {expandedAlternative === index ? 'Hide Details' : 'Show Match Details'}
+                                      </Button>
+                                    </Box>
+                                  )}
+
+                                  {/* Expanded details with matching matrix */}
+                                  <Collapse in={expandedAlternative === index}>
+                                    <Box sx={{ mt: 2 }}>
+                                      <Divider sx={{ my: 2 }} />
+                                      <Typography variant="subtitle2" gutterBottom>Matching Details</Typography>
+                                      <SimilarityVisualization
+                                        similarityScore={candidate.SimilarityScore}
+                                        fieldSimilarities={candidate.fieldSimilarities}
+                                        title={getUseCaseField(candidate, ['UseCaseName', 'Use Case Name'])}
+                                        aiEnhanced={result.aiEnhanced}
+                                        visualizationType="bars"
+                                        matchingMatrix={candidate.matchingMatrix}
+                                      />
+                                    </Box>
+                                  </Collapse>
+                                </Paper>
+                              </Grid>
+                            ))}
+                          </Grid>
+                        </Box>
+                      )}
                     </Box>
                   ) : (
                     // Match found
@@ -414,6 +652,21 @@ const PdfMatcher = () => {
                         <CheckCircleIcon color="success" sx={{ mr: 1 }} />
                         <Typography variant="h6">Match Found!</Typography>
                       </Box>
+                      
+                      {/* Alternative candidates button */}
+                      {result.alternativeCandidates && result.alternativeCandidates.length > 0 && (
+                        <Box sx={{ mt: 1, mb: 2, display: 'flex', justifyContent: 'flex-end' }}>
+                          <Button
+                            variant="outlined"
+                            startIcon={<CompareArrowsIcon />}
+                            onClick={handleToggleAlternatives}
+                            size="small"
+                          >
+                            {showAlternatives ? 'Hide' : 'Show'} Alternative Matches ({result.alternativeCandidates.length})
+                          </Button>
+                        </Box>
+                      )}
+                      
                       <Divider sx={{ my: 2 }} />
                       
                       {/* Side-by-side comparison for match found */}
@@ -422,69 +675,154 @@ const PdfMatcher = () => {
                         <Grid item xs={12} md={6}>
                           <Typography variant="h6" gutterBottom>Extracted Fields</Typography>
                           <ExtractedFieldsDisplay extractedFields={result.extractedFields || {}} />
+                          
+                          {/* PDF viewer */}
+                          {pdfDataUrl && (
+                            <Box sx={{ mt: 4 }}>
+                              <Typography variant="h6" gutterBottom>PDF Preview</Typography>
+                              <Paper elevation={1} sx={{ p: 1, height: 300 }}>
+                                <PdfViewer file={pdfDataUrl} />
+                              </Paper>
+                            </Box>
+                          )}
                         </Grid>
                         
-                        {/* Right side: Matched use case */}
+                        {/* Right side: Matched use case with improved visualization */}
                         <Grid item xs={12} md={6}>
                           <Typography variant="h6" gutterBottom>Matched Use Case</Typography>
-                          <Paper elevation={3} sx={{ p: 2, height: '100%' }}>
-                            <Typography variant="h6">{result.UseCaseName}</Typography>
-                            <Typography variant="body2" color="text.secondary" paragraph>
-                              ID: {result.UseCaseID}
-                            </Typography>
+                          
+                          <SimilarityVisualization
+                            similarityScore={result.SimilarityScore}
+                            fieldSimilarities={result.fieldSimilarities}
+                            title={getUseCaseField(result, ['UseCaseName', 'Use Case Name'])}
+                            aiEnhanced={result.aiEnhanced}
+                            visualizationType="all"
+                            matchingMatrix={result.matchingMatrix}
+                          />
+                          
+                          <Paper elevation={3} sx={{ p: 2 }}>
+                            <Typography variant="subtitle1" sx={{ mb: 2 }}>Complete Use Case Details</Typography>
+                            
                             <Box sx={{ mt: 2 }}>
-                              <Typography variant="subtitle1">Similarity Score:</Typography>
-                              <Typography variant="body1">{result.SimilarityScore}</Typography>
+                              <Typography variant="subtitle2">ID:</Typography>
+                              <Typography variant="body2">
+                                {getUseCaseField(result, ['UseCaseID', 'Use Case ID'])}
+                              </Typography>
                             </Box>
+                            
                             <Box sx={{ mt: 2 }}>
-                              <Typography variant="subtitle1">Mapped Solution:</Typography>
-                              <Typography variant="body1">{result.MappedSolution}</Typography>
+                              <Typography variant="subtitle2">Mapped Solution:</Typography>
+                              <Typography variant="body2">
+                                {getUseCaseField(result, ['MappedSolution', 'Mapped Solution'])}
+                              </Typography>
                             </Box>
-                            {result.Challenge && (
-                              <Box sx={{ mt: 2 }}>
-                                <Typography variant="subtitle1">Challenge:</Typography>
-                                <Typography variant="body1">{result.Challenge}</Typography>
-                              </Box>
-                            )}
-                            {result.UserRole && (
-                              <Box sx={{ mt: 2 }}>
-                                <Typography variant="subtitle1">User Role:</Typography>
-                                <Typography variant="body1">{result.UserRole}</Typography>
-                              </Box>
-                            )}
-                            {result.ValueDrivers && (
-                              <Box sx={{ mt: 2 }}>
-                                <Typography variant="subtitle1">Value Drivers:</Typography>
-                                <Typography variant="body1">{result.ValueDrivers}</Typography>
-                              </Box>
-                            )}
-                            {result.Enablers && (
-                              <Box sx={{ mt: 2 }}>
-                                <Typography variant="subtitle1">Enablers:</Typography>
-                                <Typography variant="body1">{result.Enablers}</Typography>
-                              </Box>
-                            )}
-                            {result.BaselineWithoutAI && (
-                              <Box sx={{ mt: 2 }}>
-                                <Typography variant="subtitle1">Baseline without AI:</Typography>
-                                <Typography variant="body1">{result.BaselineWithoutAI}</Typography>
-                              </Box>
-                            )}
-                            {result.NewWorldWithAI && (
-                              <Box sx={{ mt: 2 }}>
-                                <Typography variant="subtitle1">New World (with AI):</Typography>
-                                <Typography variant="body1">{result.NewWorldWithAI}</Typography>
-                              </Box>
-                            )}
-                            {result.KeyBenefits && (
-                              <Box sx={{ mt: 2 }}>
-                                <Typography variant="subtitle1">Key Benefits:</Typography>
-                                <Typography variant="body1">{result.KeyBenefits}</Typography>
-                              </Box>
-                            )}
+                            
+                            <Box sx={{ mt: 2 }}>
+                              <Typography variant="subtitle2">Challenge:</Typography>
+                              <Typography variant="body2">
+                                {getUseCaseField(result, ['Challenge'])}
+                              </Typography>
+                            </Box>
+                            
+                            <Box sx={{ mt: 2 }}>
+                              <Typography variant="subtitle2">User Role:</Typography>
+                              <Typography variant="body2">
+                                {getUseCaseField(result, ['UserRole', 'User Role'])}
+                              </Typography>
+                            </Box>
+                            
+                            <Box sx={{ mt: 2 }}>
+                              <Typography variant="subtitle2">Enablers:</Typography>
+                              <Typography variant="body2">
+                                {getUseCaseField(result, ['Enablers'])}
+                              </Typography>
+                            </Box>
+                            
+                            <Box sx={{ mt: 2 }}>
+                              <Typography variant="subtitle2">Key Benefits:</Typography>
+                              <Typography variant="body2">
+                                {getUseCaseField(result, ['KeyBenefits', 'Key Benefits'])}
+                              </Typography>
+                            </Box>
                           </Paper>
                         </Grid>
                       </Grid>
+                      
+                      {/* Alternative matches section */}
+                      {showAlternatives && result.alternativeCandidates && result.alternativeCandidates.length > 0 && (
+                        <Box sx={{ mt: 4 }}>
+                          <Typography variant="h6" gutterBottom>Alternative Matches</Typography>
+                          <Divider sx={{ mb: 3 }} />
+                          
+                          <Grid container spacing={3}>
+                            {result.alternativeCandidates.map((candidate, index) => (
+                              <Grid item xs={12} md={6} key={index}>
+                                <Paper elevation={2} sx={{ p: 2, height: '100%' }}>
+                                  <Typography variant="subtitle1">
+                                    {getUseCaseField(candidate, ['UseCaseName', 'Use Case Name'])}
+                                  </Typography>
+                                  <Typography variant="body2" color="text.secondary" gutterBottom>
+                                    ID: {getUseCaseField(candidate, ['UseCaseID', 'Use Case ID'])}
+                                  </Typography>
+                                  
+                                  <Box sx={{ mt: 2, mb: 2 }}>
+                                    <BasicSimilarityBar 
+                                      score={candidate.SimilarityScore} 
+                                      label="Similarity" 
+                                    />
+                                  </Box>
+                                  
+                                  <Box sx={{ mt: 2 }}>
+                                    <Typography variant="body2" sx={{ fontWeight: 'bold' }}>Mapped Solution:</Typography>
+                                    <Typography variant="body2" noWrap>
+                                      {getUseCaseField(candidate, ['MappedSolution', 'Mapped Solution'])}
+                                    </Typography>
+                                  </Box>
+                                  
+                                  <Box sx={{ mt: 1 }}>
+                                    <Typography variant="body2" sx={{ fontWeight: 'bold' }}>Challenge:</Typography>
+                                    <Typography variant="body2" noWrap>
+                                      {getUseCaseField(candidate, ['Challenge'])}
+                                    </Typography>
+                                  </Box>
+
+                                  {/* Button to toggle detailed matching matrix */}
+                                  {candidate.fieldSimilarities && candidate.matchingMatrix && (
+                                    <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center' }}>
+                                      <Button
+                                        variant="outlined"
+                                        size="small"
+                                        color="primary"
+                                        startIcon={<InfoIcon />}
+                                        onClick={() => handleToggleAlternativeDetails(index)}
+                                        sx={{ mt: 1 }}
+                                      >
+                                        {expandedAlternative === index ? 'Hide Details' : 'Show Match Details'}
+                                      </Button>
+                                    </Box>
+                                  )}
+
+                                  {/* Expanded details with matching matrix */}
+                                  <Collapse in={expandedAlternative === index}>
+                                    <Box sx={{ mt: 2 }}>
+                                      <Divider sx={{ my: 2 }} />
+                                      <Typography variant="subtitle2" gutterBottom>Matching Details</Typography>
+                                      <SimilarityVisualization
+                                        similarityScore={candidate.SimilarityScore}
+                                        fieldSimilarities={candidate.fieldSimilarities}
+                                        title={getUseCaseField(candidate, ['UseCaseName', 'Use Case Name'])}
+                                        aiEnhanced={result.aiEnhanced}
+                                        visualizationType="bars"
+                                        matchingMatrix={candidate.matchingMatrix}
+                                      />
+                                    </Box>
+                                  </Collapse>
+                                </Paper>
+                              </Grid>
+                            ))}
+                          </Grid>
+                        </Box>
+                      )}
                     </Box>
                   )}
                 </CardContent>
@@ -500,6 +838,13 @@ const PdfMatcher = () => {
                 pdfFileName={result.pdfFileName}
               />
             )}
+            
+            {/* Similarity Weights Settings Dialog */}
+            <SimilarityWeightSettings
+              open={weightsDialogOpen}
+              onClose={handleCloseWeightsDialog}
+              onSave={handleSaveWeights}
+            />
           </Box>
         )}
 
