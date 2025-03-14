@@ -152,3 +152,4 @@ The application includes a PDF matching feature that allows users to upload PDF 
 4. **Result Display**: The best matching use case is displayed alongside the extracted fields in a side-by-side comparison.
 
 Users can also download an empty form template to ensure their PDFs have the correct structure for optimal matching results.
+
